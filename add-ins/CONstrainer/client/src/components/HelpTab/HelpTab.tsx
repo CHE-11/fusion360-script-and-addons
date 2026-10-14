@@ -207,7 +207,7 @@ export function HelpTab({ active }: Props) {
             Fusion stores these apart from joints, so an Align never appears in the Joints list. This is the same idea as a mate in SolidWorks or Inventor.
           </p>
           <p id="cs_helpTopicHere_constraints" className="cs_helpText">
-            In this palette, expand a constraint to edit each offset or angle, flip it, or suppress that relationship. Rename, show, hide, suppress, select, or delete the whole constraint. Select a face, edge, point, body, or component to list the constraints that use it. Create new ones in Fusion with Constrain Components.
+            In this palette, expand a constraint to edit each offset or angle, flip it, or suppress that relationship. Hover a row to highlight that constraint in the canvas and timeline. The target button keeps the highlight on. Rename, show, hide, suppress, or delete the whole constraint. Select a face, edge, point, body, or component to list the constraints that use it. Create new ones in Fusion with Constrain Components.
           </p>
         </section>
 

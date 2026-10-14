@@ -189,9 +189,28 @@ export function AssemblyConstraintsTab({ booted, active, revision, selection }: 
     try {
       await request('constraint:select', { token });
     } catch (error) {
-      showToast(messageOf(error, 'Could not select that constraint.'), 'error');
+      showToast(messageOf(error, 'Could not highlight that constraint.'), 'error');
     }
   };
+
+  const highlightConstraint = (token: string) => {
+    void request('constraint:highlight', { token }).catch(() => {
+      // Hover stays quiet when Fusion cannot highlight the constraint.
+    });
+  };
+
+  const clearHighlight = (token: string) => {
+    void request('constraint:clearHighlight', { token }).catch(() => {
+      // The highlight is already gone if Fusion closed the palette.
+    });
+  };
+
+  useEffect(() => {
+    if (active) return;
+    void request('constraint:clearHighlight', {}).catch(() => {
+      // Leaving the tab drops a hover highlight. A pinned highlight stays.
+    });
+  }, [active]);
 
   const removeConstraint = async (constraint: AssemblyConstraintInfo) => {
     setBusy(constraint.token);
@@ -248,6 +267,8 @@ export function AssemblyConstraintsTab({ booted, active, revision, selection }: 
         setEditing(null);
       }}
       onSelect={() => void selectConstraint(constraint.token)}
+      onHighlight={() => highlightConstraint(constraint.token)}
+      onClearHighlight={() => clearHighlight(constraint.token)}
       onToggleVisible={() =>
         void run(constraint.token, 'constraint:setVisible', { visible: !constraint.isLightBulbOn }, 'Could not change visibility.')
       }

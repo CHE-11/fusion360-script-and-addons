@@ -59,6 +59,7 @@ def start():
 def stop():
     try:
         sketch_constraints.clear_highlight()
+        assembly_constraints.clear_highlight()
     except Exception:
         pass
     workspace = ui.workspaces.itemById(WORKSPACE_ID)
@@ -110,6 +111,7 @@ def command_destroy(args: adsk.core.CommandEventArgs):
 def palette_closed(args: adsk.core.UserInterfaceGeneralEventArgs):
     try:
         sketch_constraints.clear_highlight()
+        assembly_constraints.clear_highlight()
     except Exception:
         pass
     futil.log('CONstrainer palette closed.')
@@ -192,6 +194,10 @@ def route_message(action, data):
         return _ok(assembly_constraints.set_visible(data))
     if action == 'constraint:delete':
         return _ok(assembly_constraints.delete(data))
+    if action == 'constraint:highlight':
+        return _ok(assembly_constraints.highlight(data))
+    if action == 'constraint:clearHighlight':
+        return _ok(assembly_constraints.clear_highlight(data if isinstance(data, dict) else {}))
     if action == 'constraint:select':
         return _ok(assembly_constraints.select(data))
     if action == 'constraint:setValue':
@@ -207,6 +213,7 @@ def route_message(action, data):
 def on_document_activated(args):
     try:
         sketch_constraints.clear_highlight()
+        assembly_constraints.clear_highlight()
     except Exception:
         pass
     context = _document_context()
@@ -220,6 +227,8 @@ def on_document_activated(args):
 
 
 def on_selection_changed(args):
+    if assembly_constraints.selection_suspended():
+        return
     context = _document_context()
     allowed = context['jointsAllowed']
     _push('selectionChanged', {
@@ -243,6 +252,7 @@ def _push(action, payload):
 def _minimize_palette():
     try:
         sketch_constraints.clear_highlight()
+        assembly_constraints.clear_highlight()
     except Exception:
         pass
     palette = ui.palettes.itemById(PALETTE_ID)

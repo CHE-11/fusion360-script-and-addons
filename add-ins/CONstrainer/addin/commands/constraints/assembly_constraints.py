@@ -4,6 +4,8 @@ Fusion exposes these through a preview API (AssemblyConstraint, July 2025), so e
 call is guarded and the tab reports when the running Fusion does not support it.
 """
 
+from contextlib import contextmanager
+
 import adsk.core
 import adsk.fusion
 
@@ -14,6 +16,11 @@ app = adsk.core.Application.get()
 ui = app.userInterface
 
 _ASSEMBLY_CONSTRAINT = getattr(adsk.fusion, 'AssemblyConstraint', None)
+_highlight_set = None
+_highlight_token = None
+_saved_selection = None
+_pinned = False
+_suspend_depth = 0
 
 
 def is_supported():
@@ -102,15 +109,75 @@ def delete(data):
     return {'name': name}
 
 
-def select(data):
+def selection_suspended():
+    """True while a hover highlight owns the selection, so the palette does not follow it."""
+    return _suspend_depth > 0 or (_highlight_token is not None and not _pinned)
+
+
+def highlight(data):
+    """Select the constraint briefly so Fusion highlights it in the canvas and timeline.
+
+    Faces and edges are also added to a highlight set when Fusion will report them.
+    The previous selection is restored by clear_highlight.
+    """
+    global _highlight_token, _pinned
     design = j._require_joints()
-    constraint = _find_constraint(design, (data or {}).get('token', ''))
-    ui.activeSelections.clear()
-    try:
-        ui.activeSelections.add(constraint)
-    except Exception as exc:
-        raise ValueError('Fusion could not select that constraint.') from exc
-    return {'selected': 1}
+    token = str((data or {}).get('token', '') or '')
+    constraint = _find_constraint(design, token)
+    with _selection_suspended():
+        if _saved_selection is None:
+            _remember_selection()
+        _pinned = False
+        _highlight_token = token
+        selected = _try_select(constraint)
+        geometry = _highlight_geometry(constraint)
+        if not selected and geometry == 0:
+            _restore_selection()
+            _highlight_token = None
+            return {'highlighted': 0, 'selected': False, 'geometry': 0}
+    return {'highlighted': 1, 'selected': selected, 'geometry': geometry}
+
+
+def clear_highlight(data=None):
+    """Drop a hover highlight and restore the selection from before it.
+
+    Calling this with no argument, as document changes and add-in shutdown do, forgets the
+    saved selection instead of writing it into a different document. A pinned highlight from
+    the locate button stays until another constraint is highlighted or this is forced.
+    """
+    global _highlight_token, _pinned, _saved_selection
+    force = data is None or bool((data or {}).get('force'))
+    token = str((data or {}).get('token', '') or '') if data is not None else ''
+    if not force and _pinned:
+        return {'cleared': False}
+    if not force and token and _highlight_token and token != _highlight_token:
+        return {'cleared': False}
+    with _selection_suspended():
+        _clear_highlight_set()
+        if force:
+            _saved_selection = None
+        else:
+            _restore_selection()
+        _highlight_token = None
+        _pinned = False
+    return {'cleared': True}
+
+
+def select(data):
+    """Leave the constraint selected so the canvas glyph and timeline node stay highlighted."""
+    global _highlight_token, _pinned, _saved_selection
+    design = j._require_joints()
+    token = str((data or {}).get('token', '') or '')
+    constraint = _find_constraint(design, token)
+    _saved_selection = None
+    _pinned = True
+    _highlight_token = token
+    if not _try_select(constraint):
+        _pinned = False
+        _highlight_token = None
+        raise ValueError('Fusion could not highlight that constraint.')
+    geometry = _highlight_geometry(constraint)
+    return {'selected': 1, 'geometry': geometry}
 
 
 def set_value(data):
@@ -303,6 +370,113 @@ def _relationship_at(constraint, index):
         return relationships[int(index)]
     except (TypeError, ValueError, IndexError) as exc:
         raise ValueError('That relationship is no longer on the constraint.') from exc
+
+
+@contextmanager
+def _selection_suspended():
+    global _suspend_depth
+    _suspend_depth += 1
+    try:
+        yield
+    finally:
+        _suspend_depth -= 1
+
+
+def _remember_selection():
+    global _saved_selection
+    captured = []
+    try:
+        selections = ui.activeSelections
+        for index in range(selections.count):
+            try:
+                captured.append(selections.item(index).entity)
+            except Exception:
+                continue
+    except Exception:
+        captured = []
+    _saved_selection = captured
+
+
+def _restore_selection():
+    global _saved_selection
+    saved = _saved_selection
+    _saved_selection = None
+    if saved is None:
+        return
+    try:
+        ui.activeSelections.clear()
+    except Exception:
+        return
+    for entity in saved:
+        if entity is None:
+            continue
+        try:
+            ui.activeSelections.add(entity)
+        except Exception:
+            pass
+
+
+def _try_select(constraint):
+    """Select the constraint and its timeline feature. Returns whether Fusion accepted either."""
+    try:
+        selections = ui.activeSelections
+        selections.clear()
+    except Exception:
+        return False
+    targets = [constraint]
+    timeline_object = j._read_attr(constraint, 'timelineObject')
+    if timeline_object is not None:
+        targets.append(timeline_object)
+        feature = j._read_attr(timeline_object, 'entity')
+        if feature is not None:
+            targets.append(feature)
+    added = False
+    for target in targets:
+        try:
+            if selections.add(target) is not False:
+                added = True
+        except Exception:
+            pass
+    return added
+
+
+def _highlight_geometry(constraint):
+    """Highlight the faces and edges Fusion can report without rolling the timeline."""
+    global _highlight_set
+    _clear_highlight_set()
+    entities = _entities(constraint)
+    if not entities:
+        return 0
+    try:
+        highlight = ui.highlightSets.add()
+    except Exception:
+        return 0
+    added = 0
+    for entity in entities:
+        try:
+            if highlight.add(entity) is not False:
+                added += 1
+        except Exception:
+            pass
+    if added == 0:
+        try:
+            highlight.deleteMe()
+        except Exception:
+            pass
+        return 0
+    _highlight_set = highlight
+    return added
+
+
+def _clear_highlight_set():
+    global _highlight_set
+    if _highlight_set is None:
+        return
+    try:
+        _highlight_set.deleteMe()
+    except Exception:
+        pass
+    _highlight_set = None
 
 
 def _apply(action):

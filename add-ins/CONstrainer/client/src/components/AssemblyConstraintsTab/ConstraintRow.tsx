@@ -25,6 +25,8 @@ type Props = {
   onSaveName: () => void;
   onCancelRename: () => void;
   onSelect: () => void;
+  onHighlight: () => void;
+  onClearHighlight: () => void;
   onToggleVisible: () => void;
   onToggleSuppressed: () => void;
   onDelete: () => void;
@@ -56,6 +58,8 @@ export function ConstraintRow({
   onSaveName,
   onCancelRename,
   onSelect,
+  onHighlight,
+  onClearHighlight,
   onToggleVisible,
   onToggleSuppressed,
   onDelete,
@@ -69,7 +73,12 @@ export function ConstraintRow({
     .join(' ');
 
   return (
-    <article id={id('cs_asmConstraint')} className={rowClass}>
+    <article
+      id={id('cs_asmConstraint')}
+      className={rowClass}
+      onMouseEnter={onHighlight}
+      onMouseLeave={onClearHighlight}
+    >
       <div id={id('cs_asmConstraintHead')} className="cs_constraintHead">
         <button
           id={id('cs_asmConstraintToggle')}
@@ -174,8 +183,8 @@ export function ConstraintRow({
             id={id('cs_asmConstraintLocate')}
             className="cs_iconBtn"
             type="button"
-            title="Select constraint"
-            aria-label={`Select ${constraint.name}`}
+            title="Highlight in canvas and timeline"
+            aria-label={`Highlight ${constraint.name} in the canvas and timeline`}
             onClick={onSelect}
           >
             <IconCurrentLocation size={15} />

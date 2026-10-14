@@ -580,6 +580,10 @@ body {
   margin-bottom: 6px;
 }
 
+.cs_constraintCard:hover {
+  border-color: var(--cs-accent);
+}
+
 .cs_constraintHead {
   display: flex;
   align-items: center;

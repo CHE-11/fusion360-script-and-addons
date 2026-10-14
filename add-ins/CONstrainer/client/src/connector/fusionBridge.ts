@@ -554,9 +554,14 @@ async function mockRequest<T>(action: string, payload?: unknown): Promise<T> {
       };
       return data as T;
     }
+    case 'constraint:highlight':
+      findMockConstraint(body.token);
+      return { highlighted: 1, selected: true, geometry: 2 } as T;
+    case 'constraint:clearHighlight':
+      return { cleared: true } as T;
     case 'constraint:select':
       findMockConstraint(body.token);
-      return { selected: 1 } as T;
+      return { selected: 1, geometry: 2 } as T;
     case 'constraint:rename': {
       const constraint = findMockConstraint(body.token);
       const name = String(body.name ?? '').trim();
