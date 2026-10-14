@@ -402,6 +402,14 @@ body {
   font-weight: 650;
 }
 
+.cs_jointName {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .cs_sketchName,
 .cs_constraintLabel {
   min-width: 0;
@@ -479,8 +487,12 @@ body {
   padding: 4px 4px 4px 0;
 }
 
-.cs_jointSuppressed {
+.cs_jointHidden {
   opacity: 0.55;
+}
+
+.cs_jointSuppressed .cs_jointName {
+  text-decoration: line-through;
 }
 
 .cs_jointMain {
@@ -497,9 +509,11 @@ body {
 .cs_jointMeta {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
   min-width: 0;
   max-width: 100%;
+  overflow: hidden;
 }
 
 .cs_nameInput {

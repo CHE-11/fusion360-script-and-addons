@@ -6,6 +6,7 @@
  */
 
 import type {
+  DesignIntent,
   JointInfo,
   JointList,
   JointSelection,
@@ -253,7 +254,11 @@ let mockJoints: JointInfo[] = [
     sideTwo: 'Base:1',
     isAsBuilt: false,
     isSuppressed: false,
+    isLightBulbOn: false,
+    isVisible: false,
+    valueLabel: '45 deg',
     component: 'Root',
+    componentToken: 'comp-root',
   },
   {
     token: 'j-weld',
@@ -264,7 +269,11 @@ let mockJoints: JointInfo[] = [
     sideTwo: 'Base:1',
     isAsBuilt: true,
     isSuppressed: false,
+    isLightBulbOn: true,
+    isVisible: true,
+    valueLabel: '',
     component: 'Root',
+    componentToken: 'comp-root',
   },
   {
     token: 'j-slide',
@@ -275,7 +284,26 @@ let mockJoints: JointInfo[] = [
     sideTwo: 'Cabinet:1',
     isAsBuilt: false,
     isSuppressed: true,
+    isLightBulbOn: true,
+    isVisible: true,
+    valueLabel: '12 mm',
     component: 'Root',
+    componentToken: 'comp-root',
+  },
+  {
+    token: 'j-lid',
+    name: 'Lid',
+    motion: 'revolute',
+    motionLabel: 'Revolute',
+    sideOne: 'Lid:1',
+    sideTwo: 'Enclosure:1',
+    isAsBuilt: true,
+    isSuppressed: false,
+    isLightBulbOn: true,
+    isVisible: true,
+    valueLabel: '',
+    component: 'Enclosure',
+    componentToken: 'comp-enclosure',
   },
 ];
 
@@ -332,13 +360,28 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
+function mockIntent(): DesignIntent {
+  const value = new URLSearchParams(window.location.search).get('intent');
+  if (value === 'part' || value === 'assembly' || value === 'hybrid') return value;
+  return 'hybrid';
+}
+
+function mockDocument() {
+  const intent = mockIntent();
+  return {
+    doc: intent === 'part' ? 'Sample Part' : 'Sample Assembly',
+    intent,
+    jointsAllowed: intent === 'assembly' || intent === 'hybrid',
+  };
+}
+
 async function mockRequest<T>(action: string, payload?: unknown): Promise<T> {
   await new Promise((resolve) => setTimeout(resolve, 80));
   const body = (payload ?? {}) as Record<string, unknown>;
 
   switch (action) {
     case 'ready':
-      return { doc: 'Sample Design' } as T;
+      return mockDocument() as ReadyPayload as T;
     case 'palette:minimize':
       return { minimized: true, dev: true } as T;
     case 'jsLog':
@@ -398,8 +441,15 @@ async function mockRequest<T>(action: string, payload?: unknown): Promise<T> {
       sketch.constraints.push(created);
       return { sketchToken: sketch.token, constraint: created } as T;
     }
-    case 'joint:list':
-      return { joints: clone(mockJoints) } as JointList as T;
+    case 'joint:list': {
+      const document = mockDocument();
+      const data: JointList = {
+        joints: document.jointsAllowed ? clone(mockJoints) : [],
+        intent: document.intent,
+        jointsAllowed: document.jointsAllowed,
+      };
+      return data as T;
+    }
     case 'joint:readSelection':
       return clone(mockJointSelection) as T;
     case 'joint:select':
@@ -421,15 +471,27 @@ async function mockRequest<T>(action: string, payload?: unknown): Promise<T> {
       return clone(joint) as T;
     }
     case 'joint:setSuppressed': {
+      if (!mockDocument().jointsAllowed) throw new FusionError('Assembly joints are available in assembly and hybrid designs.');
       const token = String(body.token ?? '');
       const joint = mockJoints.find((item) => item.token === token);
       if (!joint) throw new FusionError('That joint is no longer in the design.');
       joint.isSuppressed = Boolean(body.suppressed);
       return clone(joint) as T;
     }
+    case 'joint:setVisible': {
+      if (!mockDocument().jointsAllowed) throw new FusionError('Assembly joints are available in assembly and hybrid designs.');
+      const token = String(body.token ?? '');
+      const joint = mockJoints.find((item) => item.token === token);
+      if (!joint) throw new FusionError('That joint is no longer in the design.');
+      joint.isLightBulbOn = Boolean(body.visible);
+      joint.isVisible = joint.isLightBulbOn;
+      return clone(joint) as T;
+    }
     case 'joint:add': {
+      if (!mockDocument().jointsAllowed) throw new FusionError('Assembly joints are available in assembly and hybrid designs.');
       const motion = String(body.motion ?? 'rigid');
       const asBuilt = Boolean(body.asBuilt);
+      const expression = String(body.expression ?? '').trim();
       const created: JointInfo = {
         token: `j-${Date.now()}`,
         name: asBuilt ? 'As-built joint' : 'Joint',
@@ -439,7 +501,11 @@ async function mockRequest<T>(action: string, payload?: unknown): Promise<T> {
         sideTwo: mockJointSelection.occurrences[1]?.name ?? 'Root',
         isAsBuilt: asBuilt,
         isSuppressed: false,
+        isLightBulbOn: true,
+        isVisible: true,
+        valueLabel: expression,
         component: 'Root',
+        componentToken: 'comp-root',
       };
       mockJoints.push(created);
       return clone(created) as T;

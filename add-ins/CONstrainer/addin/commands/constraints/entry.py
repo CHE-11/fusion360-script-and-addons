@@ -133,7 +133,7 @@ def palette_incoming(html_args: adsk.core.HTMLEventArgs):
 
 def route_message(action, data):
     if action == 'ready':
-        return _ok({'doc': _active_doc_name()})
+        return _ok(_document_context())
     if action == 'palette:minimize':
         return _ok(_minimize_palette())
     if action == 'jsLog':
@@ -169,6 +169,8 @@ def route_message(action, data):
         return _ok(joints.rename_joint(data))
     if action == 'joint:setSuppressed':
         return _ok(joints.set_suppressed(data))
+    if action == 'joint:setVisible':
+        return _ok(joints.set_visible(data))
     if action == 'joint:select':
         token = data.get('token', '') if isinstance(data, dict) else ''
         return _ok(joints.select_joint(token))
@@ -185,17 +187,21 @@ def on_document_activated(args):
         sketch_constraints.clear_highlight()
     except Exception:
         pass
-    _push('docActivated', {'name': _active_doc_name()})
+    context = _document_context()
+    _push('docActivated', context)
     _push('selectionChanged', {
         'sketch': sketch_constraints.empty_selection(),
         'joint': joints.empty_selection(),
+        'document': context,
     })
 
 
 def on_selection_changed(args):
+    context = _document_context()
     _push('selectionChanged', {
         'sketch': sketch_constraints.read_selection(),
-        'joint': joints.read_selection(),
+        'joint': joints.read_selection() if context['jointsAllowed'] else joints.empty_selection(),
+        'document': context,
     })
 
 
@@ -233,6 +239,15 @@ def _active_doc_name():
         return document.name if document else ''
     except Exception:
         return ''
+
+
+def _document_context():
+    intent = joints.design_intent()
+    return {
+        'doc': _active_doc_name(),
+        'intent': intent,
+        'jointsAllowed': intent in ('assembly', 'hybrid'),
+    }
 
 
 def _copy_to_clipboard(text):

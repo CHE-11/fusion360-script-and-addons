@@ -1,4 +1,4 @@
-import { IconCurrentLocation, IconEye, IconEyeOff, IconPencil, IconRefresh, IconSearch, IconTrash, IconX } from '@tabler/icons-react';
+import { IconBan, IconCurrentLocation, IconEye, IconEyeOff, IconPencil, IconRefresh, IconSearch, IconTrash, IconX } from '@tabler/icons-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { FusionError, request } from '../../connector/fusionBridge';
@@ -12,6 +12,13 @@ type Props = {
   revision: number;
   selection: JointSelection;
   onSelection: (selection: JointSelection) => void;
+  onAvailability: (allowed: boolean) => void;
+};
+
+type JointGroup = {
+  name: string;
+  token: string;
+  joints: JointInfo[];
 };
 
 function domId(prefix: string, token: string) {
@@ -24,7 +31,18 @@ function messageOf(error: unknown, fallback: string) {
   return fallback;
 }
 
-export function JointTab({ booted, active, revision, selection, onSelection }: Props) {
+function groupJoints(joints: JointInfo[]): JointGroup[] {
+  const groups: JointGroup[] = [];
+  for (const joint of joints) {
+    const token = joint.componentToken || joint.component || 'assembly';
+    const existing = groups.find((group) => group.token === token);
+    if (existing) existing.joints.push(joint);
+    else groups.push({ name: joint.component || 'Assembly', token, joints: [joint] });
+  }
+  return groups;
+}
+
+export function JointTab({ booted, active, revision, selection, onSelection, onAvailability }: Props) {
   const { showToast } = useToast();
   const [joints, setJoints] = useState<JointInfo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,6 +66,7 @@ export function JointTab({ booted, active, revision, selection, onSelection }: P
         if (cancelled) return;
         setJoints(data.joints);
         setLoadError(null);
+        if (!data.jointsAllowed) onAvailability(false);
       })
       .catch((error) => {
         if (!cancelled) setLoadError(messageOf(error, 'Could not load joints.'));
@@ -58,7 +77,7 @@ export function JointTab({ booted, active, revision, selection, onSelection }: P
     return () => {
       cancelled = true;
     };
-  }, [booted, revision, tick]);
+  }, [booted, revision, tick, onAvailability]);
 
   useEffect(() => {
     if (!selection.motions.length) return;
@@ -67,28 +86,30 @@ export function JointTab({ booted, active, revision, selection, onSelection }: P
 
   const motionOption = selection.motions.find((item) => item.type === motion);
   const valueKind = motionOption?.valueKind ?? 'none';
+  const readyToCreate = selection.canCreateJoint || selection.canCreateAsBuilt;
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) return joints;
     return joints.filter((joint) =>
-      [joint.name, joint.motionLabel, joint.sideOne, joint.sideTwo, joint.component, joint.isAsBuilt ? 'as-built' : '']
+      [
+        joint.name,
+        joint.motionLabel,
+        joint.valueLabel,
+        joint.sideOne,
+        joint.sideTwo,
+        joint.component,
+        joint.isAsBuilt ? 'as-built' : 'joint',
+        joint.isSuppressed ? 'suppressed' : '',
+        joint.isLightBulbOn ? '' : 'hidden',
+      ]
         .join(' ')
         .toLowerCase()
         .includes(needle)
     );
   }, [joints, query]);
 
-  const useSelection = async () => {
-    setBusy('selection');
-    try {
-      onSelection(await request<JointSelection>('joint:readSelection'));
-    } catch (error) {
-      showToast(messageOf(error, 'Could not read the selection.'), 'error');
-    } finally {
-      setBusy('');
-    }
-  };
+  const groups = useMemo(() => groupJoints(filtered), [filtered]);
 
   const createJoint = async (asBuilt: boolean) => {
     setBusy(asBuilt ? 'asBuilt' : 'joint');
@@ -115,6 +136,18 @@ export function JointTab({ booted, active, revision, selection, onSelection }: P
       await request('joint:select', { token });
     } catch (error) {
       showToast(messageOf(error, 'Could not select that joint.'), 'error');
+    }
+  };
+
+  const toggleVisible = async (joint: JointInfo) => {
+    setBusy(joint.token);
+    try {
+      await request('joint:setVisible', { token: joint.token, visible: !joint.isLightBulbOn });
+      setTick((value) => value + 1);
+    } catch (error) {
+      showToast(messageOf(error, 'Could not change visibility.'), 'error');
+    } finally {
+      setBusy('');
     }
   };
 
@@ -174,27 +207,27 @@ export function JointTab({ booted, active, revision, selection, onSelection }: P
     setDraft(joint.name);
   };
 
+  const visibilityTitle = (joint: JointInfo) => {
+    if (!joint.isLightBulbOn) return `Show ${joint.name}`;
+    if (!joint.isVisible) return `${joint.name} is hidden by a parent component or the Joints folder`;
+    return `Hide ${joint.name}`;
+  };
+
   return (
     <section id="cs_jointPanel" className="cs_tabPanel" hidden={!active} role="tabpanel" aria-labelledby="cs_tab_joints">
       <div id="cs_jointCreate" className="cs_create">
-        <div id="cs_jointCreateHead" className="cs_createHead">
-          <div id="cs_jointCreateTitle" className="cs_createTitle">
-            Create
-          </div>
-          <button
-            id="cs_jointUseSelection"
-            className="cs_btn cs_btnPrimary"
-            type="button"
-            disabled={busy === 'selection'}
-            onClick={() => void useSelection()}
-          >
-            Use selection
-          </button>
-        </div>
-        {selection.geometries.length > 0 && (
+        {selection.geometries.length > 0 ? (
           <p id="cs_jointSelectionSummary" className="cs_selectionSummary">
             {selection.geometries.map((item) => item.label).join(' · ')}
-            {selection.occurrences.length > 0 ? ` (${selection.occurrences.map((item) => item.name).join(' / ')})` : ''}
+          </p>
+        ) : (
+          <p id="cs_jointSelectionHint" className="cs_hint">
+            Select two faces, edges, points, or components.
+          </p>
+        )}
+        {selection.occurrences.length > 0 && (
+          <p id="cs_jointOccurrences" className="cs_hint">
+            {selection.occurrences.map((item) => item.name).join(' / ')}
           </p>
         )}
         {selection.motions.length > 0 && (
@@ -224,7 +257,7 @@ export function JointTab({ booted, active, revision, selection, onSelection }: P
             onChange={(event) => setExpression(event.target.value)}
           />
         )}
-        {(selection.canCreateJoint || selection.canCreateAsBuilt) && (
+        {readyToCreate && (
           <div id="cs_jointCreateActions" className="cs_chipRow">
             {selection.canCreateJoint && (
               <button
@@ -244,14 +277,14 @@ export function JointTab({ booted, active, revision, selection, onSelection }: P
             )}
           </div>
         )}
+        {selection.canCreateJoint && selection.canCreateAsBuilt && (
+          <p id="cs_jointAsBuiltHint" className="cs_hint">
+            As-built keeps the components where they are.
+          </p>
+        )}
         {selection.error && (
           <p id="cs_jointSelectionError" className="cs_inlineError">
             {selection.error}
-          </p>
-        )}
-        {selection.geometries.length === 0 && !selection.error && (
-          <p id="cs_jointSelectionHint" className="cs_hint">
-            Select two faces, edges, points, or components, then click Use selection.
           </p>
         )}
       </div>
@@ -284,110 +317,144 @@ export function JointTab({ booted, active, revision, selection, onSelection }: P
       <div id="cs_jointList" className="cs_list">
         {loadError && <EmptyState id="cs_jointLoadError" title="Could not load joints" message={loadError} />}
         {!loadError && !loading && joints.length === 0 && (
-          <EmptyState id="cs_jointEmpty" title="No joints" message="Create a joint from two faces, edges, or points." />
+          <EmptyState id="cs_jointEmpty" title="No joints" message="Select two faces, edges, points, or components to create one." />
         )}
         {!loadError && !loading && joints.length > 0 && filtered.length === 0 && (
           <EmptyState id="cs_jointNoMatches" title="No matches" message="Try a different joint name, type, or component." />
         )}
         {!loadError &&
-          filtered.map((joint) => (
-            <article
-              key={joint.token}
-              id={domId('cs_joint', joint.token)}
-              className={joint.isSuppressed ? 'cs_joint cs_jointSuppressed' : 'cs_joint'}
-            >
-              <div id={domId('cs_jointMain', joint.token)} className="cs_jointMain">
-                {editing === joint.token ? (
-                  <input
-                    id={domId('cs_jointNameInput', joint.token)}
-                    className="cs_input cs_nameInput"
-                    value={draft}
-                    aria-label={`Rename ${joint.name}`}
-                    autoFocus
-                    onChange={(event) => setDraft(event.target.value)}
-                    onBlur={() => void saveName(joint)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') {
-                        event.preventDefault();
-                        event.currentTarget.blur();
-                      } else if (event.key === 'Escape') {
-                        cancelRename.current = true;
-                        setEditing(null);
-                      }
-                    }}
-                  />
-                ) : (
-                  <button
-                    id={domId('cs_jointSelect', joint.token)}
-                    className="cs_jointSelect"
-                    type="button"
-                    onClick={() => void selectJoint(joint.token)}
-                  >
-                    <span id={domId('cs_jointName', joint.token)} className="cs_jointName">
-                      {joint.name}
-                    </span>
-                    <span id={domId('cs_jointMeta', joint.token)} className="cs_jointMeta">
-                      <span id={domId('cs_jointMotion', joint.token)} className="cs_badge">
-                        {joint.motionLabel}
-                      </span>
-                      {joint.isAsBuilt && (
-                        <span id={domId('cs_jointAsBuilt', joint.token)} className="cs_badge cs_badgeMuted">
-                          As-built
-                        </span>
+          groups.map((group) => (
+            <section key={group.token} id={domId('cs_jointGroup', group.token)} className="cs_group">
+              <h2 id={domId('cs_jointGroupName', group.token)} className="cs_groupTitle">
+                {group.name}
+              </h2>
+              {group.joints.map((joint) => {
+                const rowClass = [
+                  'cs_joint',
+                  joint.isSuppressed ? 'cs_jointSuppressed' : '',
+                  joint.isLightBulbOn ? '' : 'cs_jointHidden',
+                ]
+                  .filter(Boolean)
+                  .join(' ');
+                return (
+                  <article key={joint.token} id={domId('cs_joint', joint.token)} className={rowClass}>
+                    <div id={domId('cs_jointMain', joint.token)} className="cs_jointMain">
+                      {editing === joint.token ? (
+                        <input
+                          id={domId('cs_jointNameInput', joint.token)}
+                          className="cs_input cs_nameInput"
+                          value={draft}
+                          aria-label={`Rename ${joint.name}`}
+                          autoFocus
+                          onChange={(event) => setDraft(event.target.value)}
+                          onBlur={() => void saveName(joint)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter') {
+                              event.preventDefault();
+                              event.currentTarget.blur();
+                            } else if (event.key === 'Escape') {
+                              cancelRename.current = true;
+                              setEditing(null);
+                            }
+                          }}
+                        />
+                      ) : (
+                        <button
+                          id={domId('cs_jointSelect', joint.token)}
+                          className="cs_jointSelect"
+                          type="button"
+                          onClick={() => void selectJoint(joint.token)}
+                        >
+                          <span id={domId('cs_jointName', joint.token)} className="cs_jointName">
+                            {joint.name}
+                          </span>
+                          <span id={domId('cs_jointMeta', joint.token)} className="cs_jointMeta">
+                            <span id={domId('cs_jointMotion', joint.token)} className="cs_badge">
+                              {joint.motionLabel}
+                            </span>
+                            {joint.valueLabel && (
+                              <span id={domId('cs_jointValue', joint.token)} className="cs_muted">
+                                {joint.valueLabel}
+                              </span>
+                            )}
+                            {joint.isAsBuilt && (
+                              <span id={domId('cs_jointAsBuilt', joint.token)} className="cs_badge cs_badgeMuted">
+                                As-built
+                              </span>
+                            )}
+                            {joint.isSuppressed && (
+                              <span id={domId('cs_jointSuppressed', joint.token)} className="cs_badge cs_badgeWarn">
+                                Suppressed
+                              </span>
+                            )}
+                            <span id={domId('cs_jointSides', joint.token)} className="cs_muted">
+                              {joint.sideOne} / {joint.sideTwo}
+                            </span>
+                          </span>
+                        </button>
                       )}
-                      <span id={domId('cs_jointSides', joint.token)} className="cs_muted">
-                        {joint.sideOne} / {joint.sideTwo}
-                      </span>
-                    </span>
-                  </button>
-                )}
-              </div>
-              <div id={domId('cs_jointActions', joint.token)} className="cs_rowActions">
-                <button
-                  id={domId('cs_jointRename', joint.token)}
-                  className="cs_iconBtn"
-                  type="button"
-                  title="Rename"
-                  aria-label={`Rename ${joint.name}`}
-                  onClick={() => startRename(joint)}
-                >
-                  <IconPencil size={15} />
-                </button>
-                <button
-                  id={domId('cs_jointSuppress', joint.token)}
-                  className="cs_iconBtn"
-                  type="button"
-                  title={joint.isSuppressed ? 'Unsuppress' : 'Suppress'}
-                  aria-label={joint.isSuppressed ? `Unsuppress ${joint.name}` : `Suppress ${joint.name}`}
-                  aria-pressed={joint.isSuppressed}
-                  disabled={busy === joint.token}
-                  onClick={() => void toggleSuppressed(joint)}
-                >
-                  {joint.isSuppressed ? <IconEyeOff size={15} /> : <IconEye size={15} />}
-                </button>
-                <button
-                  id={domId('cs_jointLocate', joint.token)}
-                  className="cs_iconBtn"
-                  type="button"
-                  title="Select joint"
-                  aria-label={`Select ${joint.name}`}
-                  onClick={() => void selectJoint(joint.token)}
-                >
-                  <IconCurrentLocation size={15} />
-                </button>
-                <button
-                  id={domId('cs_jointDelete', joint.token)}
-                  className="cs_iconBtn cs_iconBtnDanger"
-                  type="button"
-                  title="Delete joint"
-                  aria-label={`Delete ${joint.name}`}
-                  disabled={busy === joint.token}
-                  onClick={() => void removeJoint(joint)}
-                >
-                  <IconTrash size={15} />
-                </button>
-              </div>
-            </article>
+                    </div>
+                    <div id={domId('cs_jointActions', joint.token)} className="cs_rowActions">
+                      <button
+                        id={domId('cs_jointRename', joint.token)}
+                        className="cs_iconBtn"
+                        type="button"
+                        title="Rename"
+                        aria-label={`Rename ${joint.name}`}
+                        onClick={() => startRename(joint)}
+                      >
+                        <IconPencil size={15} />
+                      </button>
+                      <button
+                        id={domId('cs_jointVisible', joint.token)}
+                        className="cs_iconBtn"
+                        type="button"
+                        title={visibilityTitle(joint)}
+                        aria-label={visibilityTitle(joint)}
+                        aria-pressed={joint.isLightBulbOn}
+                        disabled={busy === joint.token}
+                        onClick={() => void toggleVisible(joint)}
+                      >
+                        {joint.isLightBulbOn ? <IconEye size={15} /> : <IconEyeOff size={15} />}
+                      </button>
+                      <button
+                        id={domId('cs_jointSuppress', joint.token)}
+                        className="cs_iconBtn"
+                        type="button"
+                        title={joint.isSuppressed ? 'Unsuppress' : 'Suppress'}
+                        aria-label={joint.isSuppressed ? `Unsuppress ${joint.name}` : `Suppress ${joint.name}`}
+                        aria-pressed={joint.isSuppressed}
+                        disabled={busy === joint.token}
+                        onClick={() => void toggleSuppressed(joint)}
+                      >
+                        <IconBan size={15} />
+                      </button>
+                      <button
+                        id={domId('cs_jointLocate', joint.token)}
+                        className="cs_iconBtn"
+                        type="button"
+                        title="Select joint"
+                        aria-label={`Select ${joint.name}`}
+                        onClick={() => void selectJoint(joint.token)}
+                      >
+                        <IconCurrentLocation size={15} />
+                      </button>
+                      <button
+                        id={domId('cs_jointDelete', joint.token)}
+                        className="cs_iconBtn cs_iconBtnDanger"
+                        type="button"
+                        title="Delete joint"
+                        aria-label={`Delete ${joint.name}`}
+                        disabled={busy === joint.token}
+                        onClick={() => void removeJoint(joint)}
+                      >
+                        <IconTrash size={15} />
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
+            </section>
           ))}
       </div>
     </section>

@@ -1,10 +1,10 @@
-import { IconMinus } from '@tabler/icons-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { onEvent, request, sendJsLog, sendReady, waitForAdsk } from '../connector/fusionBridge';
 import {
   EMPTY_JOINT_SELECTION,
   EMPTY_SKETCH_SELECTION,
+  type DocumentContext,
   type JointSelection,
   type SelectionChangedPayload,
   type SketchSelection,
@@ -20,9 +20,14 @@ function AppShell() {
   const [booted, setBooted] = useState(false);
   const [tab, setTab] = useState<TabId>('sketches');
   const [docName, setDocName] = useState('');
+  const [jointsAllowed, setJointsAllowed] = useState(false);
   const [revision, setRevision] = useState(0);
   const [sketchSelection, setSketchSelection] = useState<SketchSelection>(EMPTY_SKETCH_SELECTION);
   const [jointSelection, setJointSelection] = useState<JointSelection>(EMPTY_JOINT_SELECTION);
+  const handleAvailability = useCallback((allowed: boolean) => {
+    setJointsAllowed(allowed);
+    if (!allowed) setTab('sketches');
+  }, []);
 
   useEffect(() => {
     const onError = (event: ErrorEvent) => {
@@ -45,18 +50,27 @@ function AppShell() {
 
     void waitForAdsk().then(() => setBooted(true));
 
+    const applyDocument = (data: Partial<DocumentContext> & { name?: string }) => {
+      setDocName(data.doc ?? data.name ?? '');
+      if (typeof data.jointsAllowed === 'boolean') {
+        setJointsAllowed(data.jointsAllowed);
+        if (!data.jointsAllowed) setTab((current) => (current === 'joints' ? 'sketches' : current));
+      }
+    };
+
     void sendReady()
-      .then((ready) => setDocName(ready?.doc ?? ''))
+      .then((ready) => applyDocument(ready ?? {}))
       .catch((error) => {
         showToast(error instanceof Error ? error.message : 'Could not reach Fusion.', 'error');
       });
 
     const offDoc = onEvent('docActivated', (raw) => {
       try {
-        const data = JSON.parse(raw) as { name?: string };
-        setDocName(data.name ?? '');
+        applyDocument(JSON.parse(raw) as Partial<DocumentContext> & { name?: string });
       } catch {
         setDocName('');
+        setJointsAllowed(false);
+        setTab('sketches');
       }
       setRevision((value) => value + 1);
     });
@@ -65,6 +79,7 @@ function AppShell() {
         const data = JSON.parse(raw) as SelectionChangedPayload;
         if (data.sketch) setSketchSelection(data.sketch);
         if (data.joint) setJointSelection(data.joint);
+        if (data.document) applyDocument(data.document);
       } catch {
         // Ignore a malformed push from the add-in.
       }
@@ -88,30 +103,25 @@ function AppShell() {
       .catch(() => {
         if (!cancelled) setSketchSelection(EMPTY_SKETCH_SELECTION);
       });
-    void request<JointSelection>('joint:readSelection')
-      .then((next) => {
-        if (!cancelled) setJointSelection(next);
-      })
-      .catch(() => {
-        if (!cancelled) setJointSelection(EMPTY_JOINT_SELECTION);
-      });
+    if (jointsAllowed) {
+      void request<JointSelection>('joint:readSelection')
+        .then((next) => {
+          if (!cancelled) setJointSelection(next);
+        })
+        .catch(() => {
+          if (!cancelled) setJointSelection(EMPTY_JOINT_SELECTION);
+        });
+    } else {
+      setJointSelection(EMPTY_JOINT_SELECTION);
+    }
     return () => {
       cancelled = true;
     };
-  }, [booted]);
-
-  const minimize = async () => {
-    try {
-      const result = await request<{ minimized?: boolean; dev?: boolean }>('palette:minimize');
-      if (result?.dev) showToast('In Fusion this hides the palette.', 'info');
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Could not hide the palette.', 'error');
-    }
-  };
+  }, [booted, jointsAllowed]);
 
   return (
-    <div id="cs_app" className="cs_app">
-      <Tabs active={tab} onChange={setTab} />
+    <div id="cs_app" className="cs_app" data-doc={docName}>
+      <Tabs active={tab} showJoints={jointsAllowed} onChange={setTab} />
       <main id="cs_main" className="cs_main">
         <SketchTab
           booted={booted}
@@ -120,13 +130,16 @@ function AppShell() {
           selection={sketchSelection}
           onSelection={setSketchSelection}
         />
-        <JointTab
-          booted={booted}
-          active={tab === 'joints'}
-          revision={revision}
-          selection={jointSelection}
-          onSelection={setJointSelection}
-        />
+        {jointsAllowed && (
+          <JointTab
+            booted={booted}
+            active={tab === 'joints'}
+            revision={revision}
+            selection={jointSelection}
+            onSelection={setJointSelection}
+            onAvailability={handleAvailability}
+          />
+        )}
       </main>
     </div>
   );

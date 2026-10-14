@@ -32,21 +32,41 @@ def empty_selection():
     }
 
 
+def design_intent():
+    """part, assembly, hybrid, or none when the active product is not a design."""
+    try:
+        design = _design()
+    except RuntimeError:
+        return 'none'
+    return _intent_name(design)
+
+
 def list_joints():
     design = _design()
+    intent = _intent_name(design)
+    if intent not in ('assembly', 'hybrid'):
+        return {'joints': [], 'intent': intent, 'jointsAllowed': False}
+
+    root_token = _token(design.rootComponent)
     joints = []
     for comp in _components(design):
         component_name = _safe_name(comp, 'Component')
+        component_token = _token(comp)
         for index in range(comp.joints.count):
-            joints.append(_serialize_joint(comp.joints.item(index), False, component_name))
+            joints.append(_serialize_joint(comp.joints.item(index), False, component_name, component_token))
         for index in range(comp.asBuiltJoints.count):
-            joints.append(_serialize_joint(comp.asBuiltJoints.item(index), True, component_name))
-    joints.sort(key=lambda item: (item['name'].lower(), item['motionLabel'].lower()))
-    return {'joints': joints}
+            joints.append(_serialize_joint(comp.asBuiltJoints.item(index), True, component_name, component_token))
+    joints.sort(key=lambda item: (
+        0 if item['componentToken'] == root_token else 1,
+        item['component'].lower(),
+        item['name'].lower(),
+        item['motionLabel'].lower(),
+    ))
+    return {'joints': joints, 'intent': intent, 'jointsAllowed': True}
 
 
 def delete_joint(data):
-    design = _design()
+    design = _require_joints()
     joint = _find(design, (data or {}).get('token', ''))
     name = _safe_name(joint, 'Joint')
     try:
@@ -57,7 +77,7 @@ def delete_joint(data):
 
 
 def rename_joint(data):
-    design = _design()
+    design = _require_joints()
     payload = data or {}
     joint = _find(design, payload.get('token', ''))
     name = str(payload.get('name', '') or '').strip()
@@ -71,7 +91,7 @@ def rename_joint(data):
 
 
 def set_suppressed(data):
-    design = _design()
+    design = _require_joints()
     payload = data or {}
     joint = _find(design, payload.get('token', ''))
     try:
@@ -81,8 +101,19 @@ def set_suppressed(data):
     return _serialize_found(design, joint)
 
 
+def set_visible(data):
+    design = _require_joints()
+    payload = data or {}
+    joint = _find(design, payload.get('token', ''))
+    try:
+        joint.isLightBulbOn = bool(payload.get('visible'))
+    except Exception as exc:
+        raise ValueError(str(exc)) from exc
+    return _serialize_found(design, joint)
+
+
 def select_joint(token):
-    design = _design()
+    design = _require_joints()
     joint = _find(design, token)
     ui.activeSelections.clear()
     try:
@@ -94,11 +125,13 @@ def select_joint(token):
 
 def read_selection():
     try:
-        _design()
+        design = _design()
     except RuntimeError as exc:
         result = empty_selection()
         result['error'] = str(exc)
         return result
+    if _intent_name(design) not in ('assembly', 'hybrid'):
+        return empty_selection()
 
     geometries = []
     occurrences = []
@@ -147,7 +180,7 @@ def read_selection():
 
 
 def add_joint(data):
-    design = _design()
+    design = _require_joints()
     payload = data or {}
     motion = payload.get('motion', '')
     if motion not in _MOTION_BY_TYPE:
@@ -174,7 +207,7 @@ def add_joint(data):
             _apply_motion(joint_input, motion, expression)
             created = root.asBuiltJoints.add(joint_input)
             _apply_saved_value(created, motion, expression)
-            return _serialize_joint(created, True, _safe_name(root, 'Root'))
+            return _serialize_joint(created, True, _safe_name(root, 'Root'), _token(root))
 
         if len(geometries) < 2:
             raise ValueError('Select two faces, edges, points, or joint origins.')
@@ -182,7 +215,7 @@ def add_joint(data):
         _apply_motion(joint_input, motion, expression)
         created = root.joints.add(joint_input)
         _apply_saved_value(created, motion, expression)
-        return _serialize_joint(created, False, _safe_name(root, 'Root'))
+        return _serialize_joint(created, False, _safe_name(root, 'Root'), _token(root))
     except ValueError:
         raise
     except Exception as exc:
@@ -260,15 +293,13 @@ def _literal(text):
 
 def _serialize_found(design, joint):
     is_as_built = adsk.fusion.AsBuiltJoint.cast(joint) is not None
-    component_name = 'Component'
-    try:
-        component_name = _safe_name(joint.parentComponent, 'Component')
-    except Exception:
-        component_name = 'Component'
-    return _serialize_joint(joint, is_as_built, component_name)
+    component = _read_attr(joint, 'parentComponent')
+    component_name = _safe_name(component, 'Component') if component else 'Component'
+    component_token = _token(component) if component else ''
+    return _serialize_joint(joint, is_as_built, component_name, component_token)
 
 
-def _serialize_joint(joint, is_as_built, component_name):
+def _serialize_joint(joint, is_as_built, component_name, component_token):
     motion, label = _motion_info(joint)
     return {
         'token': _token(joint),
@@ -279,7 +310,11 @@ def _serialize_joint(joint, is_as_built, component_name):
         'sideTwo': _side_label(_read_attr(joint, 'occurrenceTwo')),
         'isAsBuilt': is_as_built,
         'isSuppressed': _is_suppressed(joint),
+        'isLightBulbOn': _is_light_bulb_on(joint),
+        'isVisible': _is_visible(joint),
+        'valueLabel': _motion_value(joint),
         'component': component_name,
+        'componentToken': component_token,
     }
 
 
@@ -506,6 +541,90 @@ def _is_suppressed(joint):
         return bool(joint.isSuppressed)
     except Exception:
         return False
+
+
+def _is_light_bulb_on(joint):
+    try:
+        return bool(joint.isLightBulbOn)
+    except Exception:
+        return True
+
+
+def _is_visible(joint):
+    try:
+        return bool(joint.isVisible)
+    except Exception:
+        return _is_light_bulb_on(joint)
+
+
+_ZERO_EXPRESSIONS = {'0', '0.0', '0 deg', '0.0 deg', '0 mm', '0.0 mm', '0 in', '0.0 in'}
+
+
+def _motion_value(joint):
+    try:
+        motion = joint.jointMotion
+    except Exception:
+        return ''
+    expressions = []
+    for name in ('rotationValue', 'slideValue', 'pitchValue', 'yawValue', 'rollValue'):
+        expression = _expression(_read_attr(motion, name))
+        if expression and expression.strip().lower() not in _ZERO_EXPRESSIONS:
+            expressions.append(expression)
+    return ' · '.join(expressions)
+
+
+def _expression(parameter):
+    if parameter is None:
+        return ''
+    try:
+        return parameter.expression or ''
+    except Exception:
+        return ''
+
+
+def _intent_name(design):
+    """Map Design.designIntent to part, assembly, or hybrid.
+
+    Documents from before design intent existed stay hybrid, which is how those
+    files behave: components and local geometry together.
+    """
+    try:
+        value = design.designIntent
+    except Exception:
+        return 'hybrid'
+    number = _enum_number(value)
+    if number == 0:
+        return 'part'
+    if number == 1:
+        return 'assembly'
+    if number == 2:
+        return 'hybrid'
+    text = str(value)
+    if 'Hybrid' in text:
+        return 'hybrid'
+    if 'Assembly' in text:
+        return 'assembly'
+    if 'Part' in text:
+        return 'part'
+    return 'hybrid'
+
+
+def _enum_number(value):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        pass
+    try:
+        return int(getattr(value, 'value'))
+    except (TypeError, ValueError, AttributeError):
+        return None
+
+
+def _require_joints():
+    design = _design()
+    if _intent_name(design) not in ('assembly', 'hybrid'):
+        raise ValueError('Assembly joints are available in assembly and hybrid designs.')
+    return design
 
 
 def _components(design):

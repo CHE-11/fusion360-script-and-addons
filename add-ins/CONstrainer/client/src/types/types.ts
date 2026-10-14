@@ -1,5 +1,13 @@
 export type TabId = 'sketches' | 'joints';
 
+export type DesignIntent = 'part' | 'assembly' | 'hybrid' | 'none';
+
+export type DocumentContext = {
+  doc: string;
+  intent: DesignIntent;
+  jointsAllowed: boolean;
+};
+
 export type SketchEntityRef = {
   role: string;
   kind: string;
@@ -61,11 +69,17 @@ export type JointInfo = {
   sideTwo: string;
   isAsBuilt: boolean;
   isSuppressed: boolean;
+  isLightBulbOn: boolean;
+  isVisible: boolean;
+  valueLabel: string;
   component: string;
+  componentToken: string;
 };
 
 export type JointList = {
   joints: JointInfo[];
+  intent: DesignIntent;
+  jointsAllowed: boolean;
 };
 
 export type JointGeometryRef = {
@@ -94,13 +108,12 @@ export type JointSelection = {
   error: string | null;
 };
 
-export type ReadyPayload = {
-  doc: string;
-};
+export type ReadyPayload = DocumentContext;
 
 export type SelectionChangedPayload = {
   sketch: SketchSelection;
   joint: JointSelection;
+  document?: DocumentContext;
 };
 
 export const EMPTY_SKETCH_SELECTION: SketchSelection = {

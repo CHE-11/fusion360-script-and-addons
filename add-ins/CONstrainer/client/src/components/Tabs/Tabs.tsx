@@ -2,6 +2,7 @@ import type { TabId } from '../../types/types';
 
 type Props = {
   active: TabId;
+  showJoints: boolean;
   onChange: (tab: TabId) => void;
 };
 
@@ -10,10 +11,11 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'joints', label: 'Joints' },
 ];
 
-export function Tabs({ active, onChange }: Props) {
+export function Tabs({ active, showJoints, onChange }: Props) {
+  const tabs = TABS.filter((tab) => tab.id !== 'joints' || showJoints);
   return (
     <div id="cs_tabs" className="cs_tabs" role="tablist">
-      {TABS.map((tab) => {
+      {tabs.map((tab) => {
         const selected = tab.id === active;
         return (
           <button

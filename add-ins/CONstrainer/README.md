@@ -5,7 +5,7 @@ CONstrainer is a Fusion 360 add-in that creates and manages sketch geometric con
 The palette has two tabs:
 
 - **Sketches** lists every sketch in the active design, grouped by component. Each sketch shows whether it is fully constrained and lists its geometric constraints. Select geometry in the canvas, click **Use selection**, and apply a constraint that fits that geometry. Click a constraint to select its geometry, or delete it when Fusion allows it.
-- **Joints** lists joints and as-built joints. Rename, suppress, delete, or select a joint. Select two faces, edges, points, or components, then create a rigid, revolute, slider, cylindrical, pin-slot, planar, or ball joint. As-built create is offered when the selection resolves to two occurrences.
+- **Joints** is shown for assembly and hybrid designs. It lists joints and as-built joints under the component that owns them. Show or hide a joint, suppress it, rename it, or select it. Select two faces, edges, points, or components, then create a rigid, revolute, slider, cylindrical, pin-slot, planar, or ball joint. As-built create is offered when the selection resolves to two components.
 
 Sketch dimensions stay in ProParams. Rigid groups and contact sets are not managed here.
 
