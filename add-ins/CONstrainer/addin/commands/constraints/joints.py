@@ -25,9 +25,8 @@ def empty_selection():
     return {
         'geometries': [],
         'occurrences': [],
-        'canCreateJoint': False,
-        'canCreateAsBuilt': False,
-        'motions': [],
+        'focus': None,
+        'related': {'direct': [], 'component': []},
         'error': None,
     }
 
@@ -48,14 +47,7 @@ def list_joints():
         return {'joints': [], 'intent': intent, 'jointsAllowed': False}
 
     root_token = _token(design.rootComponent)
-    joints = []
-    for comp in _components(design):
-        component_name = _safe_name(comp, 'Component')
-        component_token = _token(comp)
-        for index in range(comp.joints.count):
-            joints.append(_serialize_joint(comp.joints.item(index), False, component_name, component_token))
-        for index in range(comp.asBuiltJoints.count):
-            joints.append(_serialize_joint(comp.asBuiltJoints.item(index), True, component_name, component_token))
+    joints = [_serialize_joint(*entry) for entry in _all_joints(design)]
     joints.sort(key=lambda item: (
         0 if item['componentToken'] == root_token else 1,
         item['component'].lower(),
@@ -135,6 +127,8 @@ def read_selection():
 
     geometries = []
     occurrences = []
+    focus_entity = None
+    focus_occurrence = None
     try:
         selections = ui.activeSelections
         count = selections.count
@@ -150,32 +144,23 @@ def read_selection():
         except Exception:
             continue
         occurrence = _occurrence(entity)
+        if focus_entity is None and _focus_kind(entity):
+            focus_entity = entity
+            focus_occurrence = occurrence
         if occurrence is not None:
             _append_occurrence(occurrences, occurrence)
-        described = _describe_geometry(entity)
-        if described is None and occurrence is not None:
+        described = _describe_geometry(entity, occurrence)
+        if described is None and adsk.fusion.Occurrence.cast(entity):
             described = _describe_from_occurrence(occurrence)
-            if described and not any(item['token'] == _token(occurrence) for item in occurrences):
-                _append_occurrence(occurrences, occurrence)
         if described and not any(item['token'] == described['token'] for item in geometries):
             geometries.append(described)
 
-    geometries = geometries[:2]
-    occurrences = occurrences[:2]
-    can_joint = len(geometries) >= 2
-    can_as_built = len(occurrences) >= 2 and len(geometries) >= 1
-    result = {
-        'geometries': geometries,
-        'occurrences': occurrences,
-        'canCreateJoint': can_joint,
-        'canCreateAsBuilt': can_as_built,
-        'motions': MOTIONS if (can_joint or can_as_built) else [],
-        'error': None,
-    }
-    if not geometries:
-        return result
-    if len(geometries) == 1 and not can_as_built:
-        result['error'] = 'Select one more face, edge, point, or joint origin.'
+    result = empty_selection()
+    result['geometries'] = geometries[:2]
+    result['occurrences'] = occurrences[:2]
+    if focus_entity is not None:
+        result['focus'] = _describe_focus(focus_entity, focus_occurrence)
+        result['related'] = _related_joints(design, focus_entity, focus_occurrence)
     return result
 
 
@@ -190,7 +175,11 @@ def add_joint(data):
     if len(geometry_tokens) < 1:
         raise ValueError('Select geometry for the joint.')
 
-    geometries = [_resolve_geometry(design, token) for token in geometry_tokens[:2]]
+    occurrence_by_geometry = payload.get('geometryOccurrenceTokens') or []
+    geometries = [
+        _resolve_geometry(design, token, occurrence_by_geometry[index] if index < len(occurrence_by_geometry) else '')
+        for index, token in enumerate(geometry_tokens[:2])
+    ]
     as_built = bool(payload.get('asBuilt'))
     root = design.rootComponent
 
@@ -207,7 +196,7 @@ def add_joint(data):
             _apply_motion(joint_input, motion, expression)
             created = root.asBuiltJoints.add(joint_input)
             _apply_saved_value(created, motion, expression)
-            return _serialize_joint(created, True, _safe_name(root, 'Root'), _token(root))
+            return _serialize_joint(created, 'asBuilt', _safe_name(root, 'Root'), _token(root))
 
         if len(geometries) < 2:
             raise ValueError('Select two faces, edges, points, or joint origins.')
@@ -215,7 +204,7 @@ def add_joint(data):
         _apply_motion(joint_input, motion, expression)
         created = root.joints.add(joint_input)
         _apply_saved_value(created, motion, expression)
-        return _serialize_joint(created, False, _safe_name(root, 'Root'), _token(root))
+        return _serialize_joint(created, 'joint', _safe_name(root, 'Root'), _token(root))
     except ValueError:
         raise
     except Exception as exc:
@@ -292,30 +281,45 @@ def _literal(text):
 
 
 def _serialize_found(design, joint):
-    is_as_built = adsk.fusion.AsBuiltJoint.cast(joint) is not None
     component = _read_attr(joint, 'parentComponent')
     component_name = _safe_name(component, 'Component') if component else 'Component'
     component_token = _token(component) if component else ''
-    return _serialize_joint(joint, is_as_built, component_name, component_token)
+    return _serialize_joint(joint, _joint_kind(joint), component_name, component_token)
 
 
-def _serialize_joint(joint, is_as_built, component_name, component_token):
+def _joint_kind(joint):
+    return 'asBuilt' if adsk.fusion.AsBuiltJoint.cast(joint) else 'joint'
+
+
+def _serialize_joint(joint, kind, component_name, component_token):
     motion, label = _motion_info(joint)
     return {
         'token': _token(joint),
         'name': _safe_name(joint, 'Joint'),
+        'kind': kind,
         'motion': motion,
         'motionLabel': label,
         'sideOne': _side_label(_read_attr(joint, 'occurrenceOne')),
         'sideTwo': _side_label(_read_attr(joint, 'occurrenceTwo')),
-        'isAsBuilt': is_as_built,
+        'isAsBuilt': kind == 'asBuilt',
         'isSuppressed': _is_suppressed(joint),
         'isLightBulbOn': _is_light_bulb_on(joint),
         'isVisible': _is_visible(joint),
         'valueLabel': _motion_value(joint),
+        'warning': _read_attr(joint, 'errorOrWarningMessage') or '',
         'component': component_name,
         'componentToken': component_token,
     }
+
+
+def _relationships(item):
+    collection = _read_attr(item, 'geometricRelationships')
+    if collection is None:
+        return []
+    try:
+        return [collection.item(index) for index in range(collection.count)]
+    except Exception:
+        return []
 
 
 def _motion_info(joint):
@@ -339,7 +343,7 @@ def _motion_info(joint):
     return ('unknown', 'Joint')
 
 
-def _describe_geometry(entity):
+def _describe_geometry(entity, occurrence=None):
     if entity is None or adsk.fusion.Occurrence.cast(entity):
         return None
     token = _token(entity)
@@ -351,6 +355,8 @@ def _describe_geometry(entity):
         'label': _geometry_label(entity),
         'token': token,
         'kind': _geometry_kind(entity),
+        'occurrenceToken': _token(occurrence) if occurrence else '',
+        'occurrenceName': _safe_name(occurrence, 'Component') if occurrence else '',
     }
 
 
@@ -358,7 +364,130 @@ def _describe_from_occurrence(occurrence):
     entity = _entity_from_occurrence(occurrence)
     if entity is None:
         return None
-    return _describe_geometry(entity)
+    described = _describe_geometry(entity, occurrence)
+    if described:
+        described['label'] = f"Component: {_safe_name(occurrence, 'Component')}"
+    return described
+
+
+def _focus_kind(entity):
+    if entity is None:
+        return None
+    if adsk.fusion.Occurrence.cast(entity):
+        return 'component'
+    if adsk.fusion.BRepBody.cast(entity):
+        return 'body'
+    if (
+        adsk.fusion.JointOrigin.cast(entity)
+        or adsk.fusion.BRepFace.cast(entity)
+        or adsk.fusion.BRepEdge.cast(entity)
+        or adsk.fusion.BRepVertex.cast(entity)
+        or adsk.fusion.SketchPoint.cast(entity)
+        or adsk.fusion.SketchCurve.cast(entity)
+        or adsk.fusion.ConstructionPoint.cast(entity)
+    ):
+        return _geometry_kind(entity)
+    return None
+
+
+def _describe_focus(entity, occurrence):
+    return {
+        'label': _geometry_label(entity),
+        'kind': _focus_kind(entity),
+        'token': _token(entity),
+        'occurrenceName': _safe_name(occurrence, 'Component') if occurrence else '',
+    }
+
+
+def _related_joints(design, entity, occurrence):
+    """Joints that use the selected item, then other joints on its component."""
+    body = adsk.fusion.BRepBody.cast(entity)
+    is_component = adsk.fusion.Occurrence.cast(entity) is not None
+    direct = []
+    component = []
+    for joint, kind, component_name, component_token in _all_joints(design):
+        if is_component:
+            uses = _touches_occurrence(joint, occurrence)
+        else:
+            uses = _uses_entity(joint, entity, body)
+        if uses:
+            direct.append(_serialize_joint(joint, kind, component_name, component_token))
+        elif not is_component and occurrence is not None and _touches_occurrence(joint, occurrence):
+            component.append(_serialize_joint(joint, kind, component_name, component_token))
+    return {'direct': direct, 'component': component}
+
+
+def _uses_entity(joint, entity, body):
+    for candidate in _joint_entities(joint):
+        if body is not None:
+            if _same(_read_attr(candidate, 'body'), body):
+                return True
+        elif _same(candidate, entity):
+            return True
+    return False
+
+
+def _touches_occurrence(joint, occurrence):
+    if occurrence is None:
+        return False
+    if _same(_read_attr(joint, 'occurrenceOne'), occurrence) or _same(_read_attr(joint, 'occurrenceTwo'), occurrence):
+        return True
+    return any(_same(_occurrence(entity), occurrence) for entity in _joint_entities(joint))
+
+
+def _joint_entities(joint):
+    entities = []
+    for relationship in _relationships(joint):
+        for entity_name in ('entityOne', 'entityTwo'):
+            entity = _read_attr(relationship, entity_name)
+            if entity is not None:
+                entities.append(entity)
+    for name in ('geometryOrOriginOne', 'geometryOrOriginTwo', 'geometry'):
+        source = _read_attr(joint, name)
+        if source is None:
+            continue
+        origin = adsk.fusion.JointOrigin.cast(source)
+        if origin:
+            entities.append(origin)
+            source = _read_attr(origin, 'geometry')
+            if source is None:
+                continue
+        for entity_name in ('entityOne', 'entityTwo'):
+            entity = _read_attr(source, entity_name)
+            if entity is not None:
+                entities.append(entity)
+    return entities
+
+
+def _same(first, second):
+    """Match two entities, including a proxy against its native object in the same occurrence."""
+    if first is None or second is None:
+        return False
+    try:
+        if first == second:
+            return True
+    except Exception:
+        pass
+    token = _token(first)
+    if token and token == _token(second):
+        return True
+    native_first = _read_attr(first, 'nativeObject') or first
+    native_second = _read_attr(second, 'nativeObject') or second
+    if native_first is first and native_second is second:
+        return False
+    try:
+        if not native_first == native_second:
+            return False
+    except Exception:
+        return False
+    context_first = _read_attr(first, 'assemblyContext')
+    context_second = _read_attr(second, 'assemblyContext')
+    if context_first is None or context_second is None:
+        return True
+    try:
+        return context_first == context_second
+    except Exception:
+        return _token(context_first) == _token(context_second)
 
 
 def _entity_from_occurrence(occurrence):
@@ -389,8 +518,21 @@ def _proxy(entity, occurrence):
         return entity
 
 
-def _resolve_geometry(design, token):
-    entity = _find(design, token)
+def _resolve_geometry(design, token, occurrence_token=''):
+    matches = _find_all(design, token)
+    if not matches:
+        raise ValueError('That geometry is no longer in the design. Set it again.')
+    entity = matches[0]
+    if occurrence_token:
+        occurrence = next(iter(_find_all(design, occurrence_token)), None)
+        for candidate in matches:
+            if occurrence is not None and _same(_occurrence(candidate), occurrence):
+                entity = candidate
+                break
+        else:
+            if occurrence is not None and _occurrence(entity) is None:
+                native = _read_attr(entity, 'nativeObject') or entity
+                entity = _proxy(native, occurrence)
     geometry = _to_joint_geometry(entity)
     if geometry is None:
         raise ValueError(f'{_geometry_label(entity)} cannot define a joint.')
@@ -496,9 +638,16 @@ def _geometry_label(entity):
         return 'Sketch curve'
     if adsk.fusion.ConstructionPoint.cast(entity):
         return 'Construction point'
+    if adsk.fusion.ConstructionPlane.cast(entity):
+        return f"Plane: {_safe_name(entity, 'Plane')}"
+    if adsk.fusion.ConstructionAxis.cast(entity):
+        return f"Axis: {_safe_name(entity, 'Axis')}"
     occurrence = adsk.fusion.Occurrence.cast(entity)
     if occurrence:
         return f"Component: {_safe_name(occurrence, 'Component')}"
+    body = adsk.fusion.BRepBody.cast(entity)
+    if body:
+        return f"Body: {_safe_name(body, 'Body')}"
     return 'Geometry'
 
 
@@ -633,6 +782,17 @@ def _components(design):
         yield components.item(index)
 
 
+def _all_joints(design):
+    """Yield (joint, kind, component_name, component_token) for every joint and as-built joint."""
+    for comp in _components(design):
+        component_name = _safe_name(comp, 'Component')
+        component_token = _token(comp)
+        for index in range(comp.joints.count):
+            yield comp.joints.item(index), 'joint', component_name, component_token
+        for index in range(comp.asBuiltJoints.count):
+            yield comp.asBuiltJoints.item(index), 'asBuilt', component_name, component_token
+
+
 def _design():
     design = adsk.fusion.Design.cast(app.activeProduct)
     if not design:
@@ -647,23 +807,37 @@ def _find(design, token):
         found = design.findEntityByToken(token)
     except Exception as exc:
         raise ValueError('That item is no longer in the design.') from exc
-    found = _unwrap(found)
-    if found is None:
+    matches = _as_list(found)
+    if not matches:
         raise ValueError('That item is no longer in the design.')
-    return found
+    return matches[0]
 
 
-def _unwrap(found):
+def _find_all(design, token):
+    if not token:
+        return []
+    try:
+        return _as_list(design.findEntityByToken(token))
+    except Exception:
+        return []
+
+
+def _as_list(found):
+    """findEntityByToken returns a SWIG vector in Python, not an adsk object."""
     if found is None:
-        return None
+        return []
+    if isinstance(found, (list, tuple)):
+        return [item for item in found if item is not None]
     try:
         if found.objectType == 'adsk::core::ObjectCollection':
-            if found.count < 1:
-                return None
-            return found.item(0)
+            return [found.item(index) for index in range(found.count)]
+        return [found]
     except Exception:
-        return found
-    return found
+        pass
+    try:
+        return [item for item in list(found) if item is not None]
+    except Exception:
+        return []
 
 
 def _token(entity):

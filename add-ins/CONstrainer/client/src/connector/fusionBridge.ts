@@ -6,6 +6,9 @@
  */
 
 import type {
+  AssemblyConstraintInfo,
+  ConstraintList,
+  ConstraintSelection,
   DesignIntent,
   JointInfo,
   JointList,
@@ -252,6 +255,8 @@ let mockJoints: JointInfo[] = [
     motionLabel: 'Revolute',
     sideOne: 'Bracket:1',
     sideTwo: 'Base:1',
+    kind: 'joint',
+    warning: '',
     isAsBuilt: false,
     isSuppressed: false,
     isLightBulbOn: false,
@@ -267,6 +272,8 @@ let mockJoints: JointInfo[] = [
     motionLabel: 'Rigid',
     sideOne: 'Cover:1',
     sideTwo: 'Base:1',
+    kind: 'asBuilt',
+    warning: '',
     isAsBuilt: true,
     isSuppressed: false,
     isLightBulbOn: true,
@@ -282,6 +289,8 @@ let mockJoints: JointInfo[] = [
     motionLabel: 'Slider',
     sideOne: 'Drawer:1',
     sideTwo: 'Cabinet:1',
+    kind: 'joint',
+    warning: '',
     isAsBuilt: false,
     isSuppressed: true,
     isLightBulbOn: true,
@@ -297,6 +306,8 @@ let mockJoints: JointInfo[] = [
     motionLabel: 'Revolute',
     sideOne: 'Lid:1',
     sideTwo: 'Enclosure:1',
+    kind: 'asBuilt',
+    warning: '',
     isAsBuilt: true,
     isSuppressed: false,
     isLightBulbOn: true,
@@ -306,6 +317,86 @@ let mockJoints: JointInfo[] = [
     componentToken: 'comp-enclosure',
   },
 ];
+
+let mockConstraints: AssemblyConstraintInfo[] = [
+  {
+    token: 'ac-lid',
+    name: 'Align1',
+    typeLabel: 'Mate',
+    sideOne: 'Bracket:1',
+    sideTwo: 'Base:1',
+    isSuppressed: false,
+    isLightBulbOn: true,
+    isVisible: true,
+    health: 'ok',
+    message: '',
+    relationships: [
+      {
+        index: 0,
+        name: 'Mate1',
+        type: 'mate',
+        isFlipped: false,
+        isSuppressed: false,
+        expression: '0 mm',
+        parameterName: 'd12',
+        entityOne: 'Planar face · Bracket:1',
+        entityTwo: 'Planar face · Base:1',
+      },
+      {
+        index: 1,
+        name: 'Mate2',
+        type: 'mate',
+        isFlipped: true,
+        isSuppressed: false,
+        expression: '2 mm',
+        parameterName: 'd13',
+        entityOne: 'Edge · Bracket:1',
+        entityTwo: 'Edge · Base:1',
+      },
+    ],
+    component: 'Root',
+    componentToken: 'comp-root',
+  },
+  {
+    token: 'ac-angle',
+    name: 'Angle1',
+    typeLabel: 'Angle',
+    sideOne: 'Lid:1',
+    sideTwo: 'Enclosure:1',
+    isSuppressed: false,
+    isLightBulbOn: true,
+    isVisible: true,
+    health: 'warning',
+    message: 'The constraint is over-defined.',
+    relationships: [
+      {
+        index: 0,
+        name: 'Angle1',
+        type: 'angle',
+        isFlipped: false,
+        isSuppressed: false,
+        expression: '90 deg',
+        parameterName: 'd14',
+        entityOne: 'Planar face · Lid:1',
+        entityTwo: 'Planar face · Enclosure:1',
+      },
+    ],
+    component: 'Root',
+    componentToken: 'comp-root',
+  },
+];
+
+function findMockConstraint(token: unknown) {
+  const constraint = mockConstraints.find((item) => item.token === String(token ?? ''));
+  if (!constraint) throw new FusionError('That assembly constraint is no longer in the design.');
+  return constraint;
+}
+
+function findMockRelationship(constraint: AssemblyConstraintInfo, index: unknown) {
+  const relationship = constraint.relationships[Number(index)];
+  if (!relationship) throw new FusionError('That relationship is no longer on the constraint.');
+  return relationship;
+}
 
 const mockSketchSelection: SketchSelection = {
   sketchName: 'Slot',
@@ -323,28 +414,24 @@ const mockSketchSelection: SketchSelection = {
   error: null,
 };
 
-const mockJointSelection: JointSelection = {
-  geometries: [
-    { label: 'Planar face', token: 'geo-face-1', kind: 'planarFace' },
-    { label: 'Face', token: 'geo-face-2', kind: 'face' },
-  ],
-  occurrences: [
-    { name: 'Bracket:1', token: 'occ-bracket' },
-    { name: 'Base:1', token: 'occ-base' },
-  ],
-  canCreateJoint: true,
-  canCreateAsBuilt: true,
-  motions: [
-    { type: 'rigid', label: 'Rigid', valueKind: 'none' },
-    { type: 'revolute', label: 'Revolute', valueKind: 'angle' },
-    { type: 'slider', label: 'Slider', valueKind: 'distance' },
-    { type: 'cylindrical', label: 'Cylindrical', valueKind: 'angle' },
-    { type: 'pinSlot', label: 'Pin-slot', valueKind: 'distance' },
-    { type: 'planar', label: 'Planar', valueKind: 'angle' },
-    { type: 'ball', label: 'Ball', valueKind: 'none' },
-  ],
-  error: null,
-};
+function mockJointSelection(): JointSelection {
+  return {
+    geometries: [
+      { label: 'Planar face', token: 'geo-face-1', kind: 'planarFace', occurrenceToken: 'occ-bracket', occurrenceName: 'Bracket:1' },
+      { label: 'Face', token: 'geo-face-2', kind: 'face', occurrenceToken: 'occ-base', occurrenceName: 'Base:1' },
+    ],
+    occurrences: [
+      { name: 'Bracket:1', token: 'occ-bracket' },
+      { name: 'Base:1', token: 'occ-base' },
+    ],
+    focus: { label: 'Planar face', kind: 'planarFace', token: 'geo-face-1', occurrenceName: 'Bracket:1' },
+    related: {
+      direct: mockJoints.filter((joint) => joint.token === 'j-hinge'),
+      component: mockJoints.filter((joint) => joint.sideOne === 'Bracket:1' && joint.token !== 'j-hinge'),
+    },
+    error: null,
+  };
+}
 
 const MOTION_LABELS: Record<string, string> = {
   rigid: 'Rigid',
@@ -450,8 +537,69 @@ async function mockRequest<T>(action: string, payload?: unknown): Promise<T> {
       };
       return data as T;
     }
+    case 'constraint:list': {
+      const document = mockDocument();
+      const data: ConstraintList = {
+        constraints: document.jointsAllowed ? clone(mockConstraints) : [],
+        supported: true,
+        allowed: document.jointsAllowed,
+      };
+      return data as T;
+    }
+    case 'constraint:readSelection': {
+      const data: ConstraintSelection = {
+        focus: mockJointSelection().focus,
+        direct: clone(mockConstraints.filter((item) => item.token === 'ac-lid')),
+        component: [],
+      };
+      return data as T;
+    }
+    case 'constraint:select':
+      findMockConstraint(body.token);
+      return { selected: 1 } as T;
+    case 'constraint:rename': {
+      const constraint = findMockConstraint(body.token);
+      const name = String(body.name ?? '').trim();
+      if (!name) throw new FusionError('Name is required.');
+      constraint.name = name;
+      return clone(constraint) as T;
+    }
+    case 'constraint:setSuppressed': {
+      const constraint = findMockConstraint(body.token);
+      constraint.isSuppressed = Boolean(body.suppressed);
+      return clone(constraint) as T;
+    }
+    case 'constraint:setVisible': {
+      const constraint = findMockConstraint(body.token);
+      constraint.isLightBulbOn = Boolean(body.visible);
+      constraint.isVisible = constraint.isLightBulbOn;
+      return clone(constraint) as T;
+    }
+    case 'constraint:delete': {
+      const constraint = findMockConstraint(body.token);
+      mockConstraints = mockConstraints.filter((item) => item.token !== constraint.token);
+      return { name: constraint.name } as T;
+    }
+    case 'constraint:setValue': {
+      const constraint = findMockConstraint(body.token);
+      const relationship = findMockRelationship(constraint, body.index);
+      const expression = String(body.expression ?? '').trim();
+      if (!expression) throw new FusionError('Enter a value, for example 5 mm or 90 deg.');
+      relationship.expression = expression;
+      return clone(constraint) as T;
+    }
+    case 'constraint:setFlipped': {
+      const constraint = findMockConstraint(body.token);
+      findMockRelationship(constraint, body.index).isFlipped = Boolean(body.flipped);
+      return clone(constraint) as T;
+    }
+    case 'constraint:setRelationshipSuppressed': {
+      const constraint = findMockConstraint(body.token);
+      findMockRelationship(constraint, body.index).isSuppressed = Boolean(body.suppressed);
+      return clone(constraint) as T;
+    }
     case 'joint:readSelection':
-      return clone(mockJointSelection) as T;
+      return clone(mockJointSelection()) as T;
     case 'joint:select':
       return { selected: 1 } as T;
     case 'joint:delete': {
@@ -492,13 +640,19 @@ async function mockRequest<T>(action: string, payload?: unknown): Promise<T> {
       const motion = String(body.motion ?? 'rigid');
       const asBuilt = Boolean(body.asBuilt);
       const expression = String(body.expression ?? '').trim();
+      const geometryTokens = (body.geometryTokens as string[]) ?? [];
+      const geometries = mockJointSelection().geometries;
+      const sides = geometryTokens.map((token) => geometries.find((item) => item.token === token)?.occurrenceName || 'Root');
+      if (!asBuilt && geometryTokens.length < 2) throw new FusionError('Select two faces, edges, points, or joint origins.');
       const created: JointInfo = {
         token: `j-${Date.now()}`,
         name: asBuilt ? 'As-built joint' : 'Joint',
         motion,
         motionLabel: MOTION_LABELS[motion] ?? 'Joint',
-        sideOne: mockJointSelection.occurrences[0]?.name ?? 'Root',
-        sideTwo: mockJointSelection.occurrences[1]?.name ?? 'Root',
+        sideOne: sides[0] ?? 'Root',
+        sideTwo: sides[1] ?? 'Root',
+        kind: asBuilt ? 'asBuilt' : 'joint',
+        warning: '',
         isAsBuilt: asBuilt,
         isSuppressed: false,
         isLightBulbOn: true,

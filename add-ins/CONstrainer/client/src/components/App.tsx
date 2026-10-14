@@ -2,18 +2,26 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { onEvent, request, sendJsLog, sendReady, waitForAdsk } from '../connector/fusionBridge';
 import {
+  EMPTY_CONSTRAINT_SELECTION,
   EMPTY_JOINT_SELECTION,
   EMPTY_SKETCH_SELECTION,
+  type ConstraintSelection,
   type DocumentContext,
   type JointSelection,
   type SelectionChangedPayload,
   type SketchSelection,
   type TabId,
 } from '../types/types';
+import { AssemblyConstraintsTab } from './AssemblyConstraintsTab/AssemblyConstraintsTab';
+import { HelpTab } from './HelpTab/HelpTab';
 import { JointTab } from './JointTab/JointTab';
 import { SketchTab } from './SketchTab/SketchTab';
 import { Tabs } from './Tabs/Tabs';
 import { ToastProvider, useToast } from './common/Toast';
+
+function leaveAssemblyTabs(current: TabId): TabId {
+  return current === 'joints' || current === 'constraints' ? 'sketches' : current;
+}
 
 function AppShell() {
   const { showToast } = useToast();
@@ -24,9 +32,10 @@ function AppShell() {
   const [revision, setRevision] = useState(0);
   const [sketchSelection, setSketchSelection] = useState<SketchSelection>(EMPTY_SKETCH_SELECTION);
   const [jointSelection, setJointSelection] = useState<JointSelection>(EMPTY_JOINT_SELECTION);
+  const [constraintSelection, setConstraintSelection] = useState<ConstraintSelection>(EMPTY_CONSTRAINT_SELECTION);
   const handleAvailability = useCallback((allowed: boolean) => {
     setJointsAllowed(allowed);
-    if (!allowed) setTab('sketches');
+    if (!allowed) setTab(leaveAssemblyTabs);
   }, []);
 
   useEffect(() => {
@@ -54,7 +63,7 @@ function AppShell() {
       setDocName(data.doc ?? data.name ?? '');
       if (typeof data.jointsAllowed === 'boolean') {
         setJointsAllowed(data.jointsAllowed);
-        if (!data.jointsAllowed) setTab((current) => (current === 'joints' ? 'sketches' : current));
+        if (!data.jointsAllowed) setTab(leaveAssemblyTabs);
       }
     };
 
@@ -70,7 +79,7 @@ function AppShell() {
       } catch {
         setDocName('');
         setJointsAllowed(false);
-        setTab('sketches');
+        setTab(leaveAssemblyTabs);
       }
       setRevision((value) => value + 1);
     });
@@ -79,6 +88,7 @@ function AppShell() {
         const data = JSON.parse(raw) as SelectionChangedPayload;
         if (data.sketch) setSketchSelection(data.sketch);
         if (data.joint) setJointSelection(data.joint);
+        if (data.constraint) setConstraintSelection(data.constraint);
         if (data.document) applyDocument(data.document);
       } catch {
         // Ignore a malformed push from the add-in.
@@ -111,8 +121,16 @@ function AppShell() {
         .catch(() => {
           if (!cancelled) setJointSelection(EMPTY_JOINT_SELECTION);
         });
+      void request<ConstraintSelection>('constraint:readSelection')
+        .then((next) => {
+          if (!cancelled) setConstraintSelection(next);
+        })
+        .catch(() => {
+          if (!cancelled) setConstraintSelection(EMPTY_CONSTRAINT_SELECTION);
+        });
     } else {
       setJointSelection(EMPTY_JOINT_SELECTION);
+      setConstraintSelection(EMPTY_CONSTRAINT_SELECTION);
     }
     return () => {
       cancelled = true;
@@ -140,6 +158,15 @@ function AppShell() {
             onAvailability={handleAvailability}
           />
         )}
+        {jointsAllowed && (
+          <AssemblyConstraintsTab
+            booted={booted}
+            active={tab === 'constraints'}
+            revision={revision}
+            selection={constraintSelection}
+          />
+        )}
+        <HelpTab active={tab === 'help'} />
       </main>
     </div>
   );

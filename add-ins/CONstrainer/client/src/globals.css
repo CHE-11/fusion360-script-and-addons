@@ -124,15 +124,19 @@ body {
   gap: 2px;
   padding: 0 8px;
   border-bottom: 1px solid var(--cs-border);
+  overflow-x: auto;
+  flex-shrink: 0;
 }
 
 .cs_tab {
-  padding: 9px 14px;
+  flex: 0 0 auto;
+  padding: 9px 12px;
   background: transparent;
   border: none;
   border-bottom: 2px solid transparent;
   color: var(--cs-text-dim);
   font-size: 13px;
+  white-space: nowrap;
   cursor: pointer;
 }
 
@@ -143,6 +147,14 @@ body {
 .cs_tabActive {
   color: var(--cs-text);
   border-bottom-color: var(--cs-accent);
+}
+
+.cs_tabHelp {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  padding-inline: 10px;
 }
 
 .cs_main {
@@ -182,6 +194,76 @@ body {
 .cs_createTitle {
   font-weight: 650;
   margin-right: auto;
+}
+
+.cs_createToggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: auto;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.cs_slot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.cs_slotLabel {
+  flex: 0 0 52px;
+  color: var(--cs-text-faint);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.cs_slotValue {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cs_slotEmpty {
+  color: var(--cs-text-faint);
+}
+
+.cs_focus {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 6px 6px 6px 10px;
+  border: 1px solid var(--cs-accent);
+  border-radius: var(--cs-radius);
+  background: var(--cs-accent-dim);
+}
+
+.cs_focusText {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.cs_focusTitle {
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cs_groupEmpty {
+  padding: 2px 0 8px;
 }
 
 .cs_toolbar {
@@ -491,6 +573,62 @@ body {
   opacity: 0.55;
 }
 
+.cs_constraintCard {
+  border: 1px solid var(--cs-border);
+  border-radius: var(--cs-radius);
+  background: var(--cs-surface);
+  margin-bottom: 6px;
+}
+
+.cs_constraintHead {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+}
+
+.cs_relationships {
+  list-style: none;
+  margin: 0;
+  padding: 0 4px 4px 32px;
+}
+
+.cs_relationship {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 0;
+  border-top: 1px solid var(--cs-border);
+}
+
+.cs_relationshipInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.cs_relationshipType {
+  margin-left: 6px;
+  vertical-align: 1px;
+}
+
+.cs_relationshipValue {
+  flex: 0 0 88px;
+  width: 88px;
+}
+
+.cs_relationshipNote {
+  padding: 6px 0;
+  border-top: 1px solid var(--cs-border);
+}
+
+.cs_badgeError {
+  background: rgba(229, 83, 75, 0.16);
+  color: var(--cs-danger);
+}
+
 .cs_jointSuppressed .cs_jointName {
   text-decoration: line-through;
 }
@@ -584,6 +722,127 @@ body {
 
 .cs_toast_info {
   border-left: 3px solid var(--cs-accent);
+}
+
+.cs_help {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 12px 24px;
+}
+
+.cs_helpIntro,
+.cs_helpSection {
+  scroll-margin-top: 8px;
+}
+
+.cs_helpTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.cs_helpLead,
+.cs_helpText,
+.cs_helpCardBody,
+.cs_helpItemBody,
+.cs_helpMotionBody {
+  margin: 6px 0 0;
+  color: var(--cs-text-dim);
+  line-height: 1.45;
+}
+
+.cs_helpCards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cs_helpCard {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--cs-border);
+  border-radius: var(--cs-radius);
+  background: var(--cs-surface);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cs_helpCard:hover {
+  border-color: var(--cs-accent);
+  background: var(--cs-accent-dim);
+}
+
+.cs_helpKicker {
+  display: block;
+  margin: 0;
+  color: var(--cs-accent);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.cs_helpCardTitle,
+.cs_helpSectionTitle,
+.cs_helpItemTitle {
+  display: block;
+  margin: 2px 0 0;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.cs_helpCardBody {
+  display: block;
+  margin-top: 4px;
+}
+
+.cs_helpSection {
+  padding-top: 4px;
+  border-top: 1px solid var(--cs-border);
+}
+
+.cs_helpSectionTitle {
+  margin-top: 4px;
+  font-size: 14px;
+}
+
+.cs_helpList,
+.cs_helpMotions {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cs_helpMotions {
+  gap: 0;
+}
+
+.cs_helpMotion {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 8px;
+  padding: 6px 0;
+  border-top: 1px solid var(--cs-border);
+}
+
+.cs_helpMotionName {
+  font-weight: 650;
+}
+
+.cs_helpMotionBody {
+  margin: 0;
 }
 
 .cs_toastCopy {

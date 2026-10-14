@@ -10,6 +10,7 @@ import adsk.core
 
 from ... import config
 from ...lib import fusionAddInUtils as futil
+from . import assembly_constraints
 from . import joints
 from . import sketch_constraints
 
@@ -179,6 +180,27 @@ def route_message(action, data):
     if action == 'joint:add':
         return _ok(joints.add_joint(data))
 
+    if action == 'constraint:list':
+        return _ok(assembly_constraints.list_constraints())
+    if action == 'constraint:readSelection':
+        return _ok(assembly_constraints.read_selection())
+    if action == 'constraint:rename':
+        return _ok(assembly_constraints.rename(data))
+    if action == 'constraint:setSuppressed':
+        return _ok(assembly_constraints.set_suppressed(data))
+    if action == 'constraint:setVisible':
+        return _ok(assembly_constraints.set_visible(data))
+    if action == 'constraint:delete':
+        return _ok(assembly_constraints.delete(data))
+    if action == 'constraint:select':
+        return _ok(assembly_constraints.select(data))
+    if action == 'constraint:setValue':
+        return _ok(assembly_constraints.set_value(data))
+    if action == 'constraint:setFlipped':
+        return _ok(assembly_constraints.set_flipped(data))
+    if action == 'constraint:setRelationshipSuppressed':
+        return _ok(assembly_constraints.set_relationship_suppressed(data))
+
     return _err(f'Unknown action: {action}')
 
 
@@ -192,15 +214,18 @@ def on_document_activated(args):
     _push('selectionChanged', {
         'sketch': sketch_constraints.empty_selection(),
         'joint': joints.empty_selection(),
+        'constraint': assembly_constraints.empty_selection(),
         'document': context,
     })
 
 
 def on_selection_changed(args):
     context = _document_context()
+    allowed = context['jointsAllowed']
     _push('selectionChanged', {
         'sketch': sketch_constraints.read_selection(),
-        'joint': joints.read_selection() if context['jointsAllowed'] else joints.empty_selection(),
+        'joint': joints.read_selection() if allowed else joints.empty_selection(),
+        'constraint': assembly_constraints.read_selection() if allowed else assembly_constraints.empty_selection(),
         'document': context,
     })
 

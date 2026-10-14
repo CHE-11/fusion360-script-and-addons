@@ -843,16 +843,20 @@ def _find(design, token):
 
 
 def _unwrap(found):
+    """findEntityByToken returns a SWIG vector in Python, not an adsk object."""
     if found is None:
         return None
     try:
         if found.objectType == 'adsk::core::ObjectCollection':
-            if found.count < 1:
-                return None
-            return found.item(0)
-    except Exception:
+            return found.item(0) if found.count > 0 else None
         return found
-    return found
+    except Exception:
+        pass
+    try:
+        items = [item for item in list(found) if item is not None]
+    except Exception:
+        return None
+    return items[0] if items else None
 
 
 def _token(entity):
