@@ -1,0 +1,14 @@
+{
+	"autodeskProduct":	"Fusion360",
+	"type":	"addin",
+	"id":	"e7a4c2b1-9f30-4c6e-8d55-1a6b3e8f47c2",
+	"author":	"Connor E",
+	"description":	{
+		"":	"Create and manage sketch constraints and assembly joints"
+	},
+	"version":	"1.0.0",
+	"runOnStartup":	true,
+	"supportedOS":	"windows|mac",
+	"editEnabled":	true,
+	"iconFilename":	"AddInIcon.png"
+}

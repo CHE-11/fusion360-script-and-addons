@@ -17,7 +17,6 @@ type TabDef = {
 const TABS: TabDef[] = [
   { id: 'global', label: 'Global', icon: <IconWorld size={16} />, hint: 'App-wide saved parameters' },
   { id: 'project', label: 'Project', icon: <IconBox size={16} />, hint: 'Parameters in the active design' },
-  { id: 'feature', label: 'Feature', icon: <IconClick size={16} />, hint: 'Parameters on the selected entity' },
 ];
 
 type Props = {

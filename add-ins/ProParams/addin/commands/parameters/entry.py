@@ -3,6 +3,8 @@ import adsk.core, adsk.fusion
 import os
 import re
 import csv
+import subprocess
+import sys
 import threading
 import time
 import traceback
@@ -244,6 +246,13 @@ def route_message(action, data):
         _handle_js_log(data)
         return _ok()
 
+    if action == 'clipboard:copy':
+        text = data.get('text') if isinstance(data, dict) else None
+        if not isinstance(text, str):
+            return _err('clipboard:copy expects text')
+        copy_to_clipboard(text)
+        return _ok({'copied': True})
+
     # Global ---------------------------------------------------------------
     if action == 'global:list':
         return _ok(load_global())
@@ -280,6 +289,23 @@ def route_message(action, data):
         return _ok(list_all_feature_params())
 
     return _err(f"Unknown action: {action}")
+
+
+def copy_to_clipboard(text):
+    """Write text to the OS clipboard. The palette webview cannot."""
+    if sys.platform == 'win32':
+        clip = os.path.join(os.environ.get('SystemRoot', r'C:\Windows'), 'System32', 'clip.exe')
+        subprocess.run(
+            [clip],
+            input=text.encode('utf-16le'),
+            check=True,
+            creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0),
+        )
+        return
+    if sys.platform == 'darwin':
+        subprocess.run(['pbcopy'], input=text.encode('utf-8'), check=True)
+        return
+    raise ValueError(f'Clipboard copy is not supported on {sys.platform}')
 
 
 def _handle_js_log(message_data):

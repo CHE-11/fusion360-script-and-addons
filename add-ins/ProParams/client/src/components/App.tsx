@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } fr
 
 import { sendJsLog, sendReady } from '../connector/fusionBridge';
 import type { TabId } from '../types/types';
-import { FeatureTab } from './FeatureTab/FeatureTab';
 import { GlobalTab } from './GlobalTab/GlobalTab';
 import { ProjectTab } from './ProjectTab/ProjectTab';
 import { Tabs } from './Tabs/Tabs';
@@ -41,7 +40,7 @@ function persistWidth(width: number) {
 }
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<TabId>('global');
+  const [activeTab, setActiveTab] = useState<TabId>('project');
   const preferredWidth = useRef(readPreferredWidth());
   const resizingRef = useRef(false);
   const [width, setWidth] = useState(() => fitAppWidth(preferredWidth.current));
@@ -139,7 +138,6 @@ export default function App() {
         <main id="pp_main" className="pp_main">
           {activeTab === 'global' && <GlobalTab />}
           {activeTab === 'project' && <ProjectTab />}
-          {activeTab === 'feature' && <FeatureTab />}
         </main>
       </ToastProvider>
       <button
