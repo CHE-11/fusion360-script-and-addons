@@ -43,15 +43,101 @@ body {
 }
 
 #root {
+  display: flex;
+  justify-content: flex-start;
   height: 100%;
+  background: var(--pp-bg);
+}
+
+/* Thin dark thumb and a transparent track, with no reserved gutter. */
+* {
+  scrollbar-gutter: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #4a4a4a transparent;
+}
+
+@supports selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+  }
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+  background: transparent;
+}
+
+*::-webkit-scrollbar-track,
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #4a4a4a;
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #5c5c5c;
 }
 
 /* ------------------------------------------------------------------ app */
 .pp_app {
+  position: relative;
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  flex: 0 0 auto;
+  height: 100%;
   min-height: 0;
+  min-width: min(320px, 100%);
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.pp_app_resize {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 30;
+  display: block;
+  width: 8px;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: col-resize;
+  touch-action: none;
+  appearance: none;
+}
+
+.pp_app_resize::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--pp-border);
+}
+
+.pp_app_resize:hover::before,
+.pp_app_resize:focus-visible::before,
+.pp_appResizing .pp_app_resize::before {
+  width: 2px;
+  background: var(--pp-accent);
+}
+
+.pp_app_resize:focus-visible {
+  outline: none;
+}
+
+body.pp_resizing,
+body.pp_resizing * {
+  cursor: col-resize !important;
+  user-select: none;
 }
 
 .pp_header {
@@ -91,9 +177,34 @@ body {
 /* ------------------------------------------------------------------ tabs */
 .pp_tabs {
   display: flex;
-  gap: 2px;
+  align-items: center;
+  gap: 8px;
   padding: 0 10px;
   border-bottom: 1px solid var(--pp-border);
+}
+
+.pp_tabList {
+  display: flex;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pp_lastSync {
+  margin-left: auto;
+  padding: 0 4px;
+  color: var(--pp-text-faint);
+  font-size: 12px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+#pp_global_pushBtn {
+  flex-shrink: 0;
+  padding: 0 6px;
+}
+
+#pp_minimize {
+  flex-shrink: 0;
 }
 
 .pp_tab {
@@ -242,9 +353,121 @@ body {
 }
 
 .pp_inputInline {
-  height: 22px;
-  padding: 0 6px;
+  height: 18px;
+  padding: 0 4px;
   font-size: 12px;
+  line-height: 16px;
+}
+
+/* --------------------------------------------------------- unit select */
+.pp_unitSelect {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+.pp_unitInput {
+  padding-right: 18px;
+}
+
+.pp_unitToggle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--pp-text-faint);
+  cursor: pointer;
+}
+
+.pp_unitToggle svg {
+  transition: transform 0.12s ease;
+}
+
+.pp_unitSelectOpen .pp_unitToggle svg {
+  transform: rotate(180deg);
+}
+
+.pp_unitMenu {
+  position: fixed;
+  z-index: 40;
+  overflow: auto;
+  padding: 4px;
+  background: var(--pp-surface);
+  color: var(--pp-text);
+  border: 1px solid var(--pp-border-strong);
+  border-radius: var(--pp-radius);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+}
+
+.pp_unitGroup {
+  position: sticky;
+  top: 0;
+  padding: 6px 8px 2px;
+  background: var(--pp-surface);
+  color: var(--pp-text-faint);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.pp_unitOption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 8px;
+  border: none;
+  border-radius: var(--pp-radius-sm);
+  background: transparent;
+  color: var(--pp-text);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pp_unitOptionActive,
+.pp_unitOption:hover {
+  background: var(--pp-accent-dim);
+}
+
+.pp_unitSymbol {
+  flex: 0 0 auto;
+  min-width: 28px;
+  font-family: 'Cascadia Code', Consolas, 'Courier New', monospace;
+  font-weight: 600;
+}
+
+.pp_unitLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--pp-text-dim);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pp_unitCategory {
+  color: var(--pp-text-faint);
+}
+
+.pp_unitCheck {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--pp-accent);
+}
+
+.pp_unitEmpty {
+  padding: 8px;
+  color: var(--pp-text-dim);
 }
 
 /* -------------------------------------------------------- table toolbar */
@@ -305,6 +528,7 @@ body {
 
 .pp_table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
 }
 
@@ -315,6 +539,10 @@ body {
   line-height: 1.2;
   border-bottom: 1px solid var(--pp-border);
   vertical-align: middle;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .pp_table thead th {
@@ -332,6 +560,7 @@ body {
 }
 
 .pp_table .pp_iconBtn {
+  flex: 0 0 18px;
   width: 18px;
   height: 18px;
   padding: 0;
@@ -353,9 +582,22 @@ body {
 }
 
 .pp_thContent {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.pp_thContent svg {
+  flex: 0 0 auto;
+}
+
+.pp_thLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .pp_table tbody tr:hover {
@@ -367,15 +609,61 @@ body {
   background: var(--pp-accent-dim);
 }
 
-.pp_actionsCol {
-  width: 1%;
-  white-space: nowrap;
+.pp_editRow td {
+  position: relative;
+  height: 27px;
+}
+
+/* Taken out of flow so an input's intrinsic width cannot stretch the column. */
+.pp_editSlot {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  top: 50%;
+  height: 18px;
+  min-width: 0;
+  transform: translateY(-50%);
+}
+
+.pp_editSlot .pp_input,
+.pp_editSlot .pp_unitSelect {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  height: 18px;
+}
+
+.pp_actionsCol,
+.pp_table td:has(.pp_actions) {
+  width: 104px;
+  overflow: visible;
+  text-overflow: clip;
 }
 
 .pp_actions {
   display: flex;
   gap: 10px;
   justify-content: flex-end;
+  align-items: center;
+}
+
+.pp_actionSpacer {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+}
+
+.pp_cellClick {
+  cursor: pointer;
+}
+
+.pp_cellClip {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .pp_cellName {
@@ -391,31 +679,28 @@ body {
   color: var(--pp-text-dim);
 }
 
-.pp_ref {
-  font-family: 'Cascadia Code', Consolas, 'Courier New', monospace;
-  font-size: 12px;
-  color: var(--pp-accent);
-  cursor: pointer;
-  padding: 0 2px;
-  border-radius: var(--pp-radius-sm);
-}
-
-.pp_ref:hover {
-  background: var(--pp-accent-dim);
-}
-
 .pp_tag {
   display: inline-block;
+  max-width: 100%;
   padding: 1px 7px;
   background: var(--pp-surface-3);
   border-radius: 10px;
   font-size: 11px;
   color: var(--pp-text);
+  vertical-align: middle;
+}
+
+.pp_cellClip.pp_tag {
+  display: block;
+  width: max-content;
 }
 
 /* ------------------------------------------------------------- empty */
 .pp_emptyCell {
   padding: 0 !important;
+  overflow: visible;
+  white-space: normal;
+  text-overflow: clip;
 }
 
 .pp_empty {
@@ -450,7 +735,7 @@ body {
 
 /* ------------------------------------------------------------- toast */
 .pp_toastContainer {
-  position: fixed;
+  position: absolute;
   right: 14px;
   bottom: 14px;
   display: flex;
@@ -463,7 +748,8 @@ body {
 }
 
 .pp_toast {
-  padding: 9px 12px;
+  position: relative;
+  padding: 9px 30px 9px 12px;
   border-radius: var(--pp-radius);
   background: var(--pp-surface-3);
   color: var(--pp-text);
@@ -472,6 +758,33 @@ body {
   cursor: pointer;
   font-size: 13px;
   animation: pp_toastIn 0.14s ease-out;
+}
+
+.pp_toastMessage {
+  display: block;
+  line-height: 1.4;
+}
+
+.pp_toastCopy {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: var(--pp-radius-sm);
+  background: transparent;
+  color: var(--pp-text-dim);
+  cursor: pointer;
+}
+
+.pp_toastCopy:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--pp-text);
 }
 
 .pp_toast_success {

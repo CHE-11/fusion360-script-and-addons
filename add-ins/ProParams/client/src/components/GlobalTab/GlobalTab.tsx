@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import { IconRefresh, IconUpload } from '@tabler/icons-react';
+import { IconRefresh } from '@tabler/icons-react';
 
 import { onEvent, request } from '../../connector/fusionBridge';
-import type { GlobalParam, PushResult } from '../../types/types';
+import type { GlobalParam } from '../../types/types';
 import { sanitizeName } from '../../utils/sanitizeName';
 import { ParamTable, type DraftRow, type TableColumn, type TableRow } from '../ParamTable/ParamTable';
 import { useToast } from '../common/Toast';
 
-const COLUMNS: TableColumn[] = ['name', 'expression', 'unit', 'comment', 'category', 'ref'];
+const COLUMNS: TableColumn[] = ['name', 'expression', 'unit', 'comment', 'category'];
 
 function toRows(params: GlobalParam[]): TableRow[] {
   return params.map((p) => ({
@@ -123,22 +123,7 @@ export function GlobalTab() {
     [params, persist, showToast]
   );
 
-  const pushToDesign = useCallback(async () => {
-    setBusy(true);
-    try {
-      const result = await request<PushResult>('global:pushToDesign', {});
-      const { created, updated, errors } = result;
-      if (errors.length) {
-        showToast(`Pushed with ${errors.length} error(s): ${errors[0]}`, 'error');
-      } else {
-        showToast(`Pushed to design (${created} created, ${updated} updated).`, 'success');
-      }
-    } catch (e) {
-      showToast(`Push failed: ${String(e)}`, 'error');
-    } finally {
-      setBusy(false);
-    }
-  }, [showToast]);
+
 
   return (
     <div id="pp_globalTab" className="pp_tabPanel">
@@ -159,16 +144,6 @@ export function GlobalTab() {
           <>
             <button className="pp_btn" title="Reload" onClick={() => void load()} disabled={busy}>
               <IconRefresh size={16} />
-            </button>
-            <button
-              id="pp_global_pushBtn"
-              className="pp_btn"
-              title="Create/update these parameters in the active design"
-              onClick={() => void pushToDesign()}
-              disabled={busy || params.length === 0}
-            >
-              <IconUpload size={16} />
-              Push to design
             </button>
           </>
         }

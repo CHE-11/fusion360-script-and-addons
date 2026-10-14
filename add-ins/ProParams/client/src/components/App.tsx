@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 
 import { sendJsLog, sendReady } from '../connector/fusionBridge';
 import type { TabId } from '../types/types';
@@ -8,8 +8,44 @@ import { ProjectTab } from './ProjectTab/ProjectTab';
 import { Tabs } from './Tabs/Tabs';
 import { ToastProvider } from './common/Toast';
 
+const DEFAULT_APP_WIDTH = 915;
+const MIN_APP_WIDTH = 320;
+const WIDTH_STORAGE_KEY = 'pp_app_width';
+
+function viewportWidth(): number {
+  return document.documentElement.clientWidth || window.innerWidth;
+}
+
+function fitAppWidth(preferred: number): number {
+  const viewport = viewportWidth();
+  const min = Math.min(MIN_APP_WIDTH, viewport);
+  return Math.round(Math.min(Math.max(preferred, min), viewport));
+}
+
+function readPreferredWidth(): number {
+  try {
+    const saved = Number(localStorage.getItem(WIDTH_STORAGE_KEY));
+    if (Number.isFinite(saved) && saved > 0) return saved;
+  } catch {
+    // Fusion's palette webview can block storage.
+  }
+  return DEFAULT_APP_WIDTH;
+}
+
+function persistWidth(width: number) {
+  try {
+    localStorage.setItem(WIDTH_STORAGE_KEY, String(width));
+  } catch {
+    // Ignore storage failures; the in-session width still applies.
+  }
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabId>('global');
+  const preferredWidth = useRef(readPreferredWidth());
+  const resizingRef = useRef(false);
+  const [width, setWidth] = useState(() => fitAppWidth(preferredWidth.current));
+  const [resizing, setResizing] = useState(false);
 
   useEffect(() => {
     // Handshake with the Fusion add-in so it can push data to us.
@@ -39,10 +75,65 @@ export default function App() {
     };
   }, []);
 
-  return (
-    <ToastProvider>
-      <div id="pp_app" className="pp_app">
+  useEffect(() => {
+    const onResize = () => setWidth(fitAppWidth(preferredWidth.current));
+    window.addEventListener('resize', onResize);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      document.body.classList.remove('pp_resizing');
+    };
+  }, []);
 
+  const applyWidth = (preferred: number, persist: boolean) => {
+    const next = fitAppWidth(preferred);
+    preferredWidth.current = next;
+    setWidth(next);
+    if (persist) persistWidth(next);
+  };
+
+  const onResizePointerDown = (event: PointerEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    resizingRef.current = true;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setResizing(true);
+    document.body.classList.add('pp_resizing');
+  };
+
+  const onResizePointerMove = (event: PointerEvent<HTMLButtonElement>) => {
+    if (!resizingRef.current) return;
+    const rootLeft = document.getElementById('root')?.getBoundingClientRect().left ?? 0;
+    applyWidth(event.clientX - rootLeft, false);
+  };
+
+  const onResizePointerUp = (event: PointerEvent<HTMLButtonElement>) => {
+    if (!resizingRef.current) return;
+    resizingRef.current = false;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    document.body.classList.remove('pp_resizing');
+    setResizing(false);
+    persistWidth(preferredWidth.current);
+  };
+
+  const onResizeKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    const step = event.shiftKey ? 64 : 16;
+    let next = preferredWidth.current;
+    if (event.key === 'ArrowLeft') next -= step;
+    else if (event.key === 'ArrowRight') next += step;
+    else if (event.key === 'Home') next = DEFAULT_APP_WIDTH;
+    else return;
+    event.preventDefault();
+    applyWidth(next, true);
+  };
+
+  return (
+    <div
+      id="pp_app"
+      className={resizing ? 'pp_app pp_appResizing' : 'pp_app'}
+      style={{ width }}
+    >
+      <ToastProvider>
         <Tabs active={activeTab} onChange={setActiveTab} />
 
         <main id="pp_main" className="pp_main">
@@ -50,7 +141,21 @@ export default function App() {
           {activeTab === 'project' && <ProjectTab />}
           {activeTab === 'feature' && <FeatureTab />}
         </main>
-      </div>
-    </ToastProvider>
+      </ToastProvider>
+      <button
+        id="pp_app_resize"
+        className="pp_app_resize"
+        type="button"
+        aria-label="Resize panel"
+        aria-valuemin={Math.min(MIN_APP_WIDTH, viewportWidth())}
+        aria-valuemax={viewportWidth()}
+        aria-valuenow={width}
+        onPointerDown={onResizePointerDown}
+        onPointerMove={onResizePointerMove}
+        onPointerUp={onResizePointerUp}
+        onPointerCancel={onResizePointerUp}
+        onKeyDown={onResizeKeyDown}
+      />
+    </div>
   );
 }

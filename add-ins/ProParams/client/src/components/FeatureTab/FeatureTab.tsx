@@ -9,7 +9,7 @@ import { ParamTable, type DraftRow, type TableColumn, type TableRow } from '../P
 import { EmptyState } from '../common/EmptyState';
 import { useToast } from '../common/Toast';
 
-const COLUMNS: TableColumn[] = ['name', 'expression', 'value', 'unit', 'comment', 'ref'];
+const COLUMNS: TableColumn[] = ['name', 'expression', 'value', 'unit', 'comment'];
 
 const EMPTY_SELECTION: FeatureSelection = { hasSelection: false, params: [] };
 

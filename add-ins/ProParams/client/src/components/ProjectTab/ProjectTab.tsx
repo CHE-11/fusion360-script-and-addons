@@ -8,7 +8,7 @@ import { sanitizeName } from '../../utils/sanitizeName';
 import { ParamTable, type DraftRow, type TableColumn, type TableRow } from '../ParamTable/ParamTable';
 import { useToast } from '../common/Toast';
 
-const COLUMNS: TableColumn[] = ['name', 'expression', 'value', 'unit', 'comment', 'ref'];
+const COLUMNS: TableColumn[] = ['name', 'expression', 'value', 'unit', 'comment'];
 
 function toRows(params: ProjectParam[]): TableRow[] {
   return params.map((p) => ({

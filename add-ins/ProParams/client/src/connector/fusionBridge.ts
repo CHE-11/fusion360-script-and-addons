@@ -22,6 +22,7 @@ import type {
   ProjectParam,
   PushResult,
 } from '../types/types';
+import { markSynced } from '../utils/lastSync';
 
 // ---------------------------------------------------------------------------
 // Response envelope
@@ -40,6 +41,9 @@ type EventListener = (data: string) => void;
 const eventListeners = new Map<string, Set<EventListener>>();
 
 function dispatchEvent(action: string, messageString: string): string {
+  if (action === 'loadGlobal' || action === 'docActivated') {
+    markSynced();
+  }
   const listeners = eventListeners.get(action);
   if (listeners) {
     listeners.forEach((cb) => {
@@ -132,7 +136,9 @@ installHandler();
  */
 export async function request<T = unknown>(action: string, payload?: unknown): Promise<T> {
   if (!hasAdsk()) {
-    return mockRequest<T>(action, payload);
+    const data = await mockRequest<T>(action, payload);
+    markSynced();
+    return data;
   }
 
   const raw = await Promise.resolve(
@@ -148,15 +154,20 @@ export async function request<T = unknown>(action: string, payload?: unknown): P
     parsed = JSON.parse(raw) as FusionResponse<T>;
   } catch {
     // Backend returned a bare string (e.g. legacy "OK"). Treat as success.
+    markSynced();
     return raw as unknown as T;
   }
 
   if (parsed && typeof parsed === 'object' && 'ok' in parsed) {
-    if (parsed.ok) return parsed.data;
+    if (parsed.ok) {
+      markSynced();
+      return parsed.data;
+    }
     throw new FusionError(parsed.error || `Request "${action}" failed`);
   }
 
   // Unknown shape; hand it back as-is.
+  markSynced();
   return parsed as unknown as T;
 }
 

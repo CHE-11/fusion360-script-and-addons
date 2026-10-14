@@ -21,7 +21,11 @@ IS_PROMOTED = True
 PALETTE_ID = config.sample_palette_id
 PALETTE_URL = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'resources', 'html', 'index.html')
 PALETTE_URL = PALETTE_URL.replace('\\', '/')
-PALETTE_DOCKING = adsk.core.PaletteDockingStates.PaletteDockStateRight
+PALETTE_DOCKING = adsk.core.PaletteDockingStates.PaletteDockStateTop  # Options are PaletteDockStateTop, PaletteDockStateBottom, PaletteDockStateLeft, PaletteDockStateRight
+PALETTE_DOCK_WIDTH = 520  # Width of the palette
+PALETTE_DOCK_HEIGHT = 640  # Height of the palette
+PALETTE_DOCK_POSITION_X = 385  # X position of the palette
+PALETTE_DOCK_POSITION_Y = 214  # Y position of the palette
 
 WORKSPACE_ID = 'FusionSolidEnvironment'
 PANEL_ID = 'SolidScriptsAddinsPanel'
@@ -165,10 +169,10 @@ def command_execute(args: adsk.core.CommandEventArgs):
             name=PALETTE_NAME,
             htmlFileURL=PALETTE_URL,
             isVisible=True,
-            showCloseButton=True,
+            showCloseButton=False,
             isResizable=True,
-            width=520,
-            height=640,
+            width=PALETTE_DOCK_WIDTH,
+            height=PALETTE_DOCK_HEIGHT,
             useNewWebBrowser=True
         )
     else:
@@ -177,13 +181,25 @@ def command_execute(args: adsk.core.CommandEventArgs):
     futil.add_handler(palette.closed, palette_closed)
     futil.add_handler(palette.incomingFromHTML, palette_incoming)
 
+    palette.width = PALETTE_DOCK_WIDTH
+    palette.height = PALETTE_DOCK_HEIGHT
+    palette.dockingState = PALETTE_DOCKING
+    # setPosition undocks the palette, so screen coordinates only apply while floating.
     if palette.dockingState == adsk.core.PaletteDockingStates.PaletteDockStateFloating:
-        palette.dockingState = PALETTE_DOCKING
+        palette.setPosition(PALETTE_DOCK_POSITION_X, PALETTE_DOCK_POSITION_Y)
     palette.isVisible = True
 
 
 def palette_closed(args: adsk.core.UserInterfaceGeneralEventArgs):
     futil.log("Palette closed.")
+
+
+def minimize_palette():
+    """Hide the palette without deleting it. The toolbar command shows it again."""
+    palette = ui.palettes.itemById(PALETTE_ID)
+    if palette:
+        palette.isVisible = False
+    return {'minimized': True}
 
 
 def _ok(data=None):
@@ -220,6 +236,9 @@ def route_message(action, data):
     # Housekeeping ---------------------------------------------------------
     if action == 'ready':
         return _ok({'global': load_global(), 'doc': _active_doc_name()})
+
+    if action == 'palette:minimize':
+        return _ok(minimize_palette())
 
     if action == 'jsLog':
         _handle_js_log(data)
@@ -499,20 +518,19 @@ def list_project_params():
 
     result = []
     user_params = design.userParameters
-    user_names = set()
     for i in range(user_params.count):
         p = user_params.item(i)
-        user_names.add(p.name)
         result.append(_serialize_param(p, True, p.isDeletable))
 
-    # Model parameters are the dimensions created by sketches and features.
-    # Driving dimensions are editable; driven dimensions stay read-only.
-    model_params = design.modelParameters
-    for i in range(model_params.count):
-        p = model_params.item(i)
-        if p.name in user_names:
+    # Model parameters belong to components, not Design. allParameters is the
+    # design-wide list: user parameters plus sketch and feature dimensions from
+    # every local component. Driving dimensions stay editable; driven ones do not.
+    all_params = design.allParameters
+    for i in range(all_params.count):
+        model_param = adsk.fusion.ModelParameter.cast(all_params.item(i))
+        if not model_param:
             continue
-        result.append(_serialize_param(p, False, False))
+        result.append(_serialize_param(model_param, False, False))
 
     return result
 
