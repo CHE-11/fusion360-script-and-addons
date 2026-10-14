@@ -29,3 +29,11 @@ Renames the selected bodies and sketches to `base_1`, `base_2`, and so on, in se
 
 **Folder:** `scripts/Renamer`
 
+---
+
+## Better Parameters
+
+Opens a window for editing parameters on the selected object, or on every object in the design, and copies a parameter name to the clipboard. It is an add-in, so add `addons/ce-parameters` from the **Add-Ins** tab instead of the Scripts tab. There is no build step.
+
+**Folder:** `addons/ce-parameters`
+
