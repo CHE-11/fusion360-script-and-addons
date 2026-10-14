@@ -1,187 +1,498 @@
 /*
- * Copyright (c) 2022 Patrick Rainsberry
- * Permission to use, copy, modify, and distribute this software in object code form
- * for any purpose and without fee is hereby granted, provided that the above copyright
- * notice appears in all copies and that both that copyright notice and the limited
- * warranty and restricted rights notice below appear in all supporting documentation.
- *
- * THIS PROGRAM IS PROVIDED "AS IS" AND WITH ALL FAULTS. THE PUBLISHER SPECIFICALLY
- * DISCLAIMS ANY IMPLIED WARRANTY OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR USE.
- * THE PUBLISHER DOES NOT WARRANT THAT THE OPERATION OF THE PROGRAM WILL BE
- * UNINTERRUPTED OR ERROR FREE.
+ * ProParams palette theme.
+ * Dark UI tuned to blend with the Fusion 360 palette chrome.
  */
 
+:root {
+  --pp-bg: #2b2b2b;
+  --pp-surface: #333333;
+  --pp-surface-2: #3c3c3c;
+  --pp-surface-3: #474747;
+  --pp-border: #4d4d4d;
+  --pp-border-strong: #5c5c5c;
+  --pp-text: #e6e6e6;
+  --pp-text-dim: #9b9b9b;
+  --pp-text-faint: #777777;
+  --pp-accent: #2e8bff;
+  --pp-accent-hover: #4a9bff;
+  --pp-accent-dim: rgba(46, 139, 255, 0.15);
+  --pp-danger: #e5534b;
+  --pp-danger-hover: #f06a63;
+  --pp-ok: #3fb950;
+  --pp-radius: 6px;
+  --pp-radius-sm: 4px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
 body {
   margin: 0;
-  font-family: sans-serif;
-  padding: 10px;
+  height: 100%;
+}
+
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-size: 13px;
+  color: var(--pp-text);
+  background: var(--pp-bg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-code {
-  /*font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;*/
+#root {
+  height: 100%;
 }
 
-.pp_container {
+/* ------------------------------------------------------------------ app */
+.pp_app {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  height: 100vh;
+  min-height: 0;
 }
 
-.pp_topbar {
+.pp_header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--pp-border);
 }
 
-.pp_title {
-  font-size: 20px;
-  font-weight: bold;
-  margin: 0;
+.pp_brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.pp_h3 {
-  margin: 5px 0 7.5px 0;
-}
-
-.pp_h3NoMargin {
-  margin: 0;
-}
-
-.pp_btn {
-  height: 30px;
-  padding: 5px 10px;
-  cursor: pointer;
-  background: #ddd;
-  border: 1px solid #999;
-  border-radius: 5px;
+.pp_brandMark {
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--pp-radius-sm);
+  background: var(--pp-accent);
+  color: #fff;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+}
+
+.pp_brandTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* ------------------------------------------------------------------ tabs */
+.pp_tabs {
+  display: flex;
+  gap: 2px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--pp-border);
+}
+
+.pp_tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 14px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--pp-text-dim);
+  font-size: 13px;
+  cursor: pointer;
+  transition: color 0.12s, border-color 0.12s;
+}
+
+.pp_tab:hover {
+  color: var(--pp-text);
+}
+
+.pp_tabActive {
+  color: var(--pp-text);
+  border-bottom-color: var(--pp-accent);
+}
+
+/* ------------------------------------------------------------------ main */
+.pp_main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.pp_tabPanel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.pp_scopeBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--pp-border);
+  background: var(--pp-surface);
+}
+
+.pp_scopeName {
+  font-weight: 600;
+}
+
+/* ------------------------------------------------------------- buttons */
+.pp_btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  background: var(--pp-surface-2);
+  color: var(--pp-text);
+  border: 1px solid var(--pp-border-strong);
+  border-radius: var(--pp-radius-sm);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.pp_btn:hover:not(:disabled) {
+  background: var(--pp-surface-3);
+}
+
+.pp_btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.pp_btnPrimary {
+  background: var(--pp-accent);
+  border-color: var(--pp-accent);
+  color: #fff;
+}
+
+.pp_btnPrimary:hover:not(:disabled) {
+  background: var(--pp-accent-hover);
+  border-color: var(--pp-accent-hover);
+}
+
+.pp_iconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  color: var(--pp-text-dim);
+  border: 1px solid transparent;
+  border-radius: var(--pp-radius-sm);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.pp_iconBtn:hover:not(:disabled) {
+  background: var(--pp-surface-3);
+  color: var(--pp-text);
+}
+
+.pp_iconBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pp_iconBtnDanger,
+.pp_table .pp_iconBtn.pp_iconBtnDanger {
+  color: var(--pp-danger);
+}
+
+.pp_iconBtnDanger:hover:not(:disabled),
+.pp_table .pp_iconBtn.pp_iconBtnDanger:hover:not(:disabled) {
+  color: var(--pp-danger-hover);
+}
+
+.pp_iconBtnOk {
+  color: var(--pp-ok);
+}
+
+/* -------------------------------------------------------------- inputs */
+.pp_input {
+  width: 100%;
+  height: 30px;
+  padding: 0 8px;
+  background: var(--pp-surface);
+  color: var(--pp-text);
+  border: 1px solid var(--pp-border-strong);
+  border-radius: var(--pp-radius-sm);
+  font-size: 13px;
+  outline: none;
+}
+
+.pp_input:focus {
+  border-color: var(--pp-accent);
+  box-shadow: 0 0 0 2px var(--pp-accent-dim);
+}
+
+.pp_inputInline {
+  height: 22px;
+  padding: 0 6px;
+  font-size: 12px;
+}
+
+/* -------------------------------------------------------- table toolbar */
+.pp_tableWrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.pp_tableToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+}
+
+.pp_search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  max-width: 280px;
+}
+
+.pp_searchIcon {
+  position: absolute;
+  left: 8px;
+  color: var(--pp-text-faint);
+  pointer-events: none;
+}
+
+.pp_searchInput {
+  padding-left: 28px;
+}
+
+.pp_searchClear {
+  position: absolute;
+  right: 2px;
+  width: 24px;
+  height: 24px;
+}
+
+.pp_toolbarActions {
+  display: flex;
   align-items: center;
   gap: 6px;
 }
 
-.pp_btnPrimary {
-  background: #007bff;
-  color: white;
-  border-color: #0056b3;
-}
-
-.pp_btnDanger {
-  background: #dc3545;
-  color: white;
-  border-color: #bd2130;
-}
-
-.pp_btnIcon {
-  padding: 5px;
-  justify-content: center;
-}
-
-.pp_card {
-  border: 1px solid #ccc;
-  padding: 10px;
-  border-radius: 5px;
-  background: #fafafa;
-}
-
-.pp_cardTight {
-  margin-top: 10px;
-}
-
-.pp_input {
-  box-sizing: border-box;
-  width: 100%;
-  height: 30px;
-  padding: 5px;
-  border: 1px solid #ccc;
-  border-radius: 5px;
-  font-size: 16px;
-  margin-bottom: 10px;
-}
-
-.pp_projectList {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-
-.pp_projectItem {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px;
-  border-bottom: 1px solid #eee;
-  cursor: pointer;
-  border-radius: 5px;
-  background-color: #f5f5f5;
-  border: 2px solid transparent;
-}
-
-.pp_projectItem:hover {
-  background-color: #f5f5f5;
-}
-
-.pp_projectItemSelected {
-  background-color: #eef;
-  border: 2px solid #007bff;
-}
-
-.pp_projectName {
-  flex-grow: 1;
-}
-
-.pp_hr {
-  width: 100%;
-  margin: 10px 0;
-}
-
-.pp_paramsHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.pp_controls {
-  display: flex;
-  gap: 5px;
-  align-items: center;
+/* ---------------------------------------------------------------- table */
+.pp_tableScroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0 14px 14px;
 }
 
 .pp_table {
   width: 100%;
   border-collapse: collapse;
-  margin-top: 10px;
 }
 
 .pp_table th,
 .pp_table td {
-  border: 1px solid #ccc;
-  padding: 5px;
   text-align: left;
+  padding: 4px 6px;
+  line-height: 1.2;
+  border-bottom: 1px solid var(--pp-border);
+  vertical-align: middle;
 }
 
-.pp_table th {
-  background: #eee;
-  font-size: 14px;
+.pp_table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 4px 6px;
+  background: var(--pp-surface);
+  color: var(--pp-text-dim);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--pp-border-strong);
 }
 
-.pp_table td {
-  font-size: 12px;
+.pp_table .pp_iconBtn {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  color: var(--pp-text);
 }
 
-.pp_ref {
+.pp_table .pp_iconBtn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.pp_sortable {
   cursor: pointer;
+  user-select: none;
+}
+
+.pp_sortable:hover {
+  color: var(--pp-text);
+}
+
+.pp_thContent {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pp_table tbody tr:hover {
+  background: var(--pp-surface);
+}
+
+.pp_editRow,
+.pp_editRow:hover {
+  background: var(--pp-accent-dim);
+}
+
+.pp_actionsCol {
+  width: 1%;
+  white-space: nowrap;
 }
 
 .pp_actions {
   display: flex;
-  gap: 5px;
-}
-
-.pp_rowRight {
-  display: flex;
   gap: 10px;
   justify-content: flex-end;
+}
+
+.pp_cellName {
+  font-weight: 600;
+}
+
+.pp_cellMono {
+  font-family: 'Cascadia Code', Consolas, 'Courier New', monospace;
+  font-size: 12px;
+}
+
+.pp_muted {
+  color: var(--pp-text-dim);
+}
+
+.pp_ref {
+  font-family: 'Cascadia Code', Consolas, 'Courier New', monospace;
+  font-size: 12px;
+  color: var(--pp-accent);
+  cursor: pointer;
+  padding: 0 2px;
+  border-radius: var(--pp-radius-sm);
+}
+
+.pp_ref:hover {
+  background: var(--pp-accent-dim);
+}
+
+.pp_tag {
+  display: inline-block;
+  padding: 1px 7px;
+  background: var(--pp-surface-3);
+  border-radius: 10px;
+  font-size: 11px;
+  color: var(--pp-text);
+}
+
+/* ------------------------------------------------------------- empty */
+.pp_emptyCell {
+  padding: 0 !important;
+}
+
+.pp_empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+  padding: 44px 20px;
+  color: var(--pp-text-dim);
+}
+
+.pp_emptyIcon {
+  color: var(--pp-text-faint);
+}
+
+.pp_emptyTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--pp-text);
+}
+
+.pp_emptyMessage {
+  max-width: 360px;
+  line-height: 1.5;
+}
+
+.pp_emptyAction {
+  margin-top: 8px;
+}
+
+/* ------------------------------------------------------------- toast */
+.pp_toastContainer {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  z-index: 1000;
+  width: max-content;
+  max-width: calc(100% - 28px);
+}
+
+.pp_toast {
+  padding: 9px 12px;
+  border-radius: var(--pp-radius);
+  background: var(--pp-surface-3);
+  color: var(--pp-text);
+  border: 1px solid var(--pp-border-strong);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  font-size: 13px;
+  animation: pp_toastIn 0.14s ease-out;
+}
+
+.pp_toast_success {
+  border-left: 3px solid var(--pp-ok);
+}
+
+.pp_toast_error {
+  border-left: 3px solid var(--pp-danger);
+}
+
+.pp_toast_info {
+  border-left: 3px solid var(--pp-accent);
+}
+
+@keyframes pp_toastIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

@@ -1,5 +1,7 @@
 # ProParams
 
+ProParams is a Fusion 360 Add-In that allows you to easily create and manage parameters for your designs.
+
 ## Build
 When you run the build script the following will happen: 
 1. Build the React client (`client/`) for production.
